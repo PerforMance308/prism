@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;family=Inter:wght@300..700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "background": "#0e0e0e",
+              "on-surface": "#ffffff",
+              "surface-bright": "#2c2c2c",
+              "on-tertiary-fixed": "#270048",
+              "error": "#ff6e84",
+              "outline": "#777575",
+              "surface-container": "#1a1919",
+              "secondary-fixed": "#62fae3",
+              "surface-dim": "#0e0e0e",
+              "secondary-dim": "#50ebd5",
+              "primary-container": "#9396ff",
+              "surface-tint": "#a3a6ff",
+              "on-secondary-fixed-variant": "#00675c",
+              "on-secondary": "#005c52",
+              "on-error-container": "#ffb2b9",
+              "primary": "#a3a6ff",
+              "on-primary-container": "#0a0081",
+              "inverse-on-surface": "#565554",
+              "on-surface-variant": "#adaaaa",
+              "inverse-primary": "#494bd7",
+              "surface-container-lowest": "#000000",
+              "on-tertiary-container": "#000000",
+              "tertiary": "#c180ff",
+              "on-primary": "#0f00a4",
+              "secondary": "#62fae3",
+              "on-primary-fixed": "#000000",
+              "secondary-fixed-dim": "#50ebd5",
+              "tertiary-dim": "#9c48ea",
+              "surface-container-high": "#201f1f",
+              "error-container": "#a70138",
+              "surface-variant": "#262626",
+              "on-background": "#ffffff",
+              "tertiary-container": "#af5cfe",
+              "on-error": "#490013",
+              "tertiary-fixed": "#ce9bff",
+              "primary-fixed": "#9396ff",
+              "primary-dim": "#6063ee",
+              "tertiary-fixed-dim": "#c488ff",
+              "secondary-container": "#006b5f",
+              "surface-container-low": "#131313",
+              "surface-container-highest": "#262626",
+              "on-primary-fixed-variant": "#0e009d",
+              "on-tertiary-fixed-variant": "#560094",
+              "on-secondary-container": "#dcfff7",
+              "primary-fixed-dim": "#8387ff",
+              "error-dim": "#d73357",
+              "inverse-surface": "#fcf8f8",
+              "on-secondary-fixed": "#004840",
+              "outline-variant": "#494847",
+              "on-tertiary": "#33005b",
+              "surface": "#0e0e0e"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>body {
+    background-color: #0e0e0e;
+    color: #fff;
+    font-family: "Inter", sans-serif;
+    margin: 0
+    }
+.material-symbols-outlined {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24
+    }
+.grain-texture {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDDwmemz4-TeB0CdbjuucClA9_aqWjfXnQMvmAvuS7gz1y3-X142bMET_GTkMq8QIQ5jcZePRTuk0hB_rmDuYUBuXZy4rSogJg4bHe3odHwyrOmODPypulE9m0phheofMqxqGHGloVlzvaKRJYjLdC2VzfSXMX1GQ3sMLok6iSSttY1SqAwAnJUqyXunKfRz46dHnAVVPPPrAvyNY-j7ztjDKACLZinyoHpBi31kNmTyhGK_5821UWyoqG11LblTqEvr7lOVaQKAWQ);
+    opacity: 0.03;
+    pointer-events: none
+    }
+.gradient-primary {
+    background: linear-gradient(135deg, #a3a6ff 0%, #9396ff 100%)
+    }</style>
+</head>
+<body class="overflow-hidden">
+<!-- Background Texture -->
+<div class="fixed inset-0 grain-texture z-0"></div>
+<!-- SideNavBar -->
+<aside class="fixed left-0 top-0 h-full flex flex-col w-64 bg-neutral-950 dark:bg-[#131313] z-50">
+<div class="p-8">
+<div class="flex items-center gap-3 mb-10">
+<div class="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-on-primary-fixed text-sm" style="font-variation-settings: 'FILL' 1;">insights</span>
+</div>
+<h1 class="text-xl font-bold tracking-tight text-white dark:text-[#ffffff] font-headline">Curator</h1>
+</div>
+<button class="w-full py-3 mb-8 gradient-primary text-on-primary-fixed font-semibold rounded-xl flex items-center justify-center gap-2 scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span class="font-label text-sm">New Analysis</span>
+</button>
+<nav class="space-y-1">
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-[#ffffff] bg-[#1a1919] font-semibold transition-colors duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard_customize</span>
+<span class="font-label text-sm">Canvas</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-[#adaaaa] hover:text-[#ffffff] hover:bg-[#201f1f] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">timeline</span>
+<span class="font-label text-sm">Traces</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-[#adaaaa] hover:text-[#ffffff] hover:bg-[#201f1f] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="font-label text-sm">Metrics</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-[#adaaaa] hover:text-[#ffffff] hover:bg-[#201f1f] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">segment</span>
+<span class="font-label text-sm">Logs</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded-xl text-[#adaaaa] hover:text-[#ffffff] hover:bg-[#201f1f] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label text-sm">Settings</span>
+</a>
+</nav>
+</div>
+<div class="mt-auto p-8 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-[#adaaaa] hover:text-[#ffffff] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">menu_book</span>
+<span class="font-label text-xs">Documentation</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-[#adaaaa] hover:text-[#ffffff] transition-colors duration-200" href="#">
+<span class="material-symbols-outlined text-[20px]">headset_mic</span>
+<span class="font-label text-xs">Support</span>
+</a>
+<div class="pt-6 flex items-center gap-3">
+<img alt="User Profile" class="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant/20" data-alt="Close up portrait of a professional male user with a neutral expression and clean studio lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBy3Yc14NWfSK1QdJLg28mBQ8-6y3v-Me1ZTT5i9aMbKxx6oGf139Le9BxOH-Q8T3d2wOsKZhXqihVhaWNi14vFRgu_KcC_ZBftRJV_3NzNCmfb9Y6uU-c9TaQrWlZxT5C3S9tJttVM1SXi5-eYJXPW5zMlE-xw4Rwhl57yIl1m2aW0_IHtAVJzPFnDqAKBHM4g-pa5VxtoCKRmBh6tw3feCsdS1eQaFHhhlgY8uPSpqz89RIU8-f0lI4hECixrq_a3jNfl6oob2VE"/>
+<div>
+<p class="text-xs font-semibold text-white">Alex Chen</p>
+<p class="text-[10px] text-on-surface-variant">Site Reliability Engineer</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopAppBar -->
+<header class="fixed top-0 right-0 left-64 z-50 flex justify-between items-center px-8 h-16 bg-neutral-950/60 dark:bg-[#0e0e0e]/60 backdrop-blur-xl">
+<div class="flex items-center">
+<span class="text-lg font-black tracking-tighter text-white dark:text-[#ffffff] font-headline uppercase">The Observability Canvas</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="relative flex items-center bg-surface-container px-4 py-1.5 rounded-full border border-outline-variant/10">
+<span class="material-symbols-outlined text-on-surface-variant text-sm mr-2">search</span>
+<input class="bg-transparent border-none text-xs focus:ring-0 p-0 text-white w-48 placeholder:text-on-surface-variant" placeholder="Search systems..." type="text"/>
+</div>
+<div class="flex items-center gap-4 text-on-surface-variant">
+<button class="hover:text-white transition-opacity cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="hover:text-white transition-opacity cursor-pointer active:opacity-70">
+<span class="material-symbols-outlined">help_outline</span>
+</button>
+<div class="w-8 h-8 rounded-full overflow-hidden bg-surface-container-high cursor-pointer border border-outline-variant/20">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="Professional avatar of a male technology expert with soft lighting and a minimalist dark background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXmfnUln0PNisSKQmEF93rP7aNJMebxJH97X1bHdUlX2ZBPVHKllignZIo8QVe31hFqYAqjCyx4TI2uNgsEADEUg-LEQDp7d3k89r9S6ayjOml8zEnkyJVFfowipmSMLx2xE8ft1KcU-E3X3o7GawmAOlAXANj9msq2b5Z2Hpik7wJCzhXFFgKlbtjoHZRHN0VX1LszRELihMHJLrYb-SRCRbwlq1ZIFLS77eHfDHGlf8VTzLyo7RiGaS65LJLziJEUXukBJ4b8QQ"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-64 pt-16 h-screen flex flex-col items-center justify-center relative bg-surface-container">
+<!-- Center AI Chat Interface -->
+<div class="w-full max-w-3xl px-6 flex flex-col items-center">
+<div class="mb-12 text-center">
+<h2 class="font-headline text-5xl font-extrabold tracking-tight text-white mb-4">
+                    Welcome, what are we <span class="text-primary italic">investigating</span> today?
+                </h2>
+<p class="font-body text-on-surface-variant text-lg">Curator is analyzing 4.2TB of telemetry in real-time.</p>
+</div>
+<!-- Prominent Chat Input -->
+<div class="w-full relative group">
+<div class="absolute inset-0 bg-primary/10 blur-2xl rounded-3xl group-focus-within:bg-primary/20 transition-all duration-500"></div>
+<div class="relative bg-surface-bright/80 backdrop-blur-xl rounded-[2rem] p-6 shadow-2xl border border-outline-variant/10">
+<div class="flex items-start gap-4">
+<div class="mt-1 flex items-center justify-center w-10 h-10 rounded-full bg-surface-container-high border border-primary/20">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+<textarea class="flex-1 bg-transparent border-none focus:ring-0 text-lg text-white placeholder:text-outline/60 font-body resize-none py-2" placeholder="Ask Curator to analyze, explain, or visualize..." rows="2"></textarea>
+</div>
+<div class="mt-4 flex justify-between items-center">
+<div class="flex gap-2">
+<button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">attach_file</span>
+</button>
+<button class="p-2 rounded-lg hover:bg-surface-container-highest text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined text-[20px]">query_stats</span>
+</button>
+</div>
+<button class="px-6 py-2 gradient-primary text-on-primary-fixed font-bold rounded-xl flex items-center gap-2 hover:opacity-90 transition-opacity">
+<span class="font-label text-sm uppercase tracking-wider">Analyze</span>
+<span class="material-symbols-outlined text-[18px]">north_east</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Suggested Prompts -->
+<div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+<button class="p-5 bg-surface-container-low hover:bg-surface-container-high rounded-2xl border border-outline-variant/5 text-left transition-all group">
+<div class="flex items-center gap-2 text-primary mb-2">
+<span class="material-symbols-outlined text-[18px]">bolt</span>
+<span class="text-[10px] font-bold font-label uppercase tracking-widest">Performance</span>
+</div>
+<p class="text-on-surface-variant text-sm font-body leading-relaxed group-hover:text-white transition-colors">
+                        "Analyze CPU spike in checkout-service"
+                    </p>
+</button>
+<button class="p-5 bg-surface-container-low hover:bg-surface-container-high rounded-2xl border border-outline-variant/5 text-left transition-all group">
+<div class="flex items-center gap-2 text-tertiary mb-2">
+<span class="material-symbols-outlined text-[18px]">bar_chart</span>
+<span class="text-[10px] font-bold font-label uppercase tracking-widest">Dashboards</span>
+</div>
+<p class="text-on-surface-variant text-sm font-body leading-relaxed group-hover:text-white transition-colors">
+                        "Create a dashboard for user login latency"
+                    </p>
+</button>
+<button class="p-5 bg-surface-container-low hover:bg-surface-container-high rounded-2xl border border-outline-variant/5 text-left transition-all group">
+<div class="flex items-center gap-2 text-error mb-2">
+<span class="material-symbols-outlined text-[18px]">report_problem</span>
+<span class="text-[10px] font-bold font-label uppercase tracking-widest">Incident</span>
+</div>
+<p class="text-on-surface-variant text-sm font-body leading-relaxed group-hover:text-white transition-colors">
+                        "Explain the recent 5xx error surge"
+                    </p>
+</button>
+</div>
+</div>
+<!-- Semantic Background Elements -->
+<div class="absolute bottom-12 right-12 flex gap-12 items-end opacity-20 pointer-events-none">
+<div class="flex flex-col gap-2">
+<div class="w-1 h-12 bg-outline-variant/30 rounded-full overflow-hidden">
+<div class="w-full h-1/2 gradient-primary"></div>
+</div>
+<div class="w-1 h-16 bg-outline-variant/30 rounded-full overflow-hidden">
+<div class="w-full h-1/3 gradient-primary"></div>
+</div>
+<div class="w-1 h-8 bg-outline-variant/30 rounded-full overflow-hidden">
+<div class="w-full h-2/3 gradient-primary"></div>
+</div>
+</div>
+<div class="text-right">
+<span class="text-[10px] font-label text-on-surface-variant uppercase tracking-[0.3em]">System Entropy</span>
+<div class="text-2xl font-headline font-light text-primary">0.042 ms</div>
+</div>
+</div>
+</main>
+<!-- AI Floating Action (Contextual Tooltip/Status) -->
+<div class="fixed bottom-8 right-8 z-50">
+<div class="flex items-center gap-3 bg-surface-bright/40 backdrop-blur-md px-4 py-2 rounded-full border border-outline-variant/10">
+<div class="flex gap-1">
+<div class="w-1.5 h-1.5 rounded-full bg-secondary-fixed animate-pulse"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-secondary-fixed opacity-60"></div>
+<div class="w-1.5 h-1.5 rounded-full bg-secondary-fixed opacity-30"></div>
+</div>
+<span class="text-[10px] font-label font-medium text-secondary-fixed uppercase tracking-wider">Collector Active</span>
+</div>
+</div>
+</body></html>

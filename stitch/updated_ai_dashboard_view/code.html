@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "tertiary-fixed": "#ce9bff",
+              "primary-fixed-dim": "#8387ff",
+              "surface-container-low": "#131313",
+              "on-secondary-fixed": "#004840",
+              "tertiary": "#c180ff",
+              "tertiary-container": "#af5cfe",
+              "primary-fixed": "#9396ff",
+              "on-tertiary-fixed-variant": "#560094",
+              "surface": "#0e0e0e",
+              "on-tertiary": "#33005b",
+              "inverse-on-surface": "#565554",
+              "on-primary": "#0f00a4",
+              "surface-container-highest": "#262626",
+              "primary": "#a3a6ff",
+              "surface-container-lowest": "#000000",
+              "surface-tint": "#a3a6ff",
+              "on-surface": "#ffffff",
+              "inverse-primary": "#494bd7",
+              "error": "#ff6e84",
+              "surface-variant": "#262626",
+              "inverse-surface": "#fcf8f8",
+              "outline-variant": "#494847",
+              "primary-container": "#9396ff",
+              "on-secondary": "#005c52",
+              "outline": "#777575",
+              "surface-bright": "#2c2c2c",
+              "surface-container": "#1a1919",
+              "on-background": "#ffffff",
+              "secondary": "#62fae3",
+              "on-primary-container": "#0a0081",
+              "on-primary-fixed-variant": "#0e009d",
+              "surface-container-high": "#201f1f",
+              "surface-dim": "#0e0e0e",
+              "on-error-container": "#ffb2b9",
+              "secondary-fixed-dim": "#50ebd5",
+              "tertiary-dim": "#9c48ea",
+              "on-surface-variant": "#adaaaa",
+              "secondary-dim": "#50ebd5",
+              "error-dim": "#d73357",
+              "error-container": "#a70138",
+              "secondary-container": "#006b5f",
+              "on-error": "#490013",
+              "on-tertiary-container": "#000000",
+              "background": "#0e0e0e",
+              "on-secondary-container": "#dcfff7",
+              "on-primary-fixed": "#000000",
+              "secondary-fixed": "#62fae3",
+              "tertiary-fixed-dim": "#c488ff",
+              "on-tertiary-fixed": "#270048",
+              "primary-dim": "#6063ee",
+              "on-secondary-fixed-variant": "#00675c"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #0e0e0e; color: white; margin: 0; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .canvas-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1.5rem; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar Component -->
+<aside class="fixed left-0 top-0 h-full z-40 flex flex-col h-screen w-20 hover:w-64 transition-all duration-300 ease-in-out border-none bg-[#131313] dark:bg-zinc-900 font-['Manrope'] antialiased tracking-tight group overflow-hidden">
+<div class="p-6 flex items-center space-x-4">
+<div class="w-8 h-8 bg-gradient-to-br from-primary to-primary-dim rounded-lg flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary-fixed text-xl" style="font-variation-settings: 'FILL' 1;">analytics</span>
+</div>
+<span class="text-xl font-bold text-white tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity">Observability</span>
+</div>
+<nav class="flex-1 px-4 space-y-2 mt-4">
+<!-- Active Tab: Dashboards -->
+<a class="flex items-center space-x-4 p-3 text-[#a3a6ff] bg-[#1a1919] rounded-lg scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="dashboard">dashboard</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Dashboards</span>
+</a>
+<a class="flex items-center space-x-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="notifications_active">notifications_active</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Alerts</span>
+</a>
+<a class="flex items-center space-x-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="description">description</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Reports</span>
+</a>
+<a class="flex items-center space-x-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="explore">explore</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Explore</span>
+</a>
+</nav>
+<div class="px-4 py-6 space-y-2 border-t border-white/5">
+<a class="flex items-center space-x-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="settings">settings</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Settings</span>
+</a>
+<a class="flex items-center space-x-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors rounded-lg" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="help">help</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Help</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-20 flex flex-col h-screen overflow-hidden">
+<!-- TopNavBar Component -->
+<header class="w-full h-16 sticky top-0 z-30 flex items-center justify-between px-6 bg-[#0e0e0e]/80 backdrop-blur-xl font-['Manrope'] text-sm font-medium">
+<div class="flex items-center space-x-6">
+<h1 class="text-lg font-black text-white">The Observability Canvas</h1>
+<div class="h-4 w-[1px] bg-outline-variant/30"></div>
+<nav class="flex items-center space-x-4 text-zinc-400">
+<span class="hover:text-white transition-colors cursor-pointer">Dashboards</span>
+<span class="material-symbols-outlined text-[14px]">chevron_right</span>
+<span class="text-white font-semibold">Production Overview</span>
+</nav>
+</div>
+<div class="flex items-center space-x-6">
+<div class="flex items-center space-x-3 bg-surface-container-high px-3 py-1.5 rounded-lg border border-outline-variant/10">
+<span class="material-symbols-outlined text-primary text-sm">schedule</span>
+<span class="text-zinc-200">Last 24h</span>
+<span class="material-symbols-outlined text-zinc-500 text-sm">expand_more</span>
+</div>
+<div class="flex items-center space-x-4 border-l border-white/5 pl-6">
+<button class="flex items-center space-x-2 text-zinc-400 hover:text-white transition-colors">
+<span class="material-symbols-outlined">history</span>
+</button>
+<button class="flex items-center space-x-2 text-zinc-400 hover:text-white transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<div class="absolute -top-1 -right-1 w-2 h-2 bg-error rounded-full ring-2 ring-surface"></div>
+</button>
+<button class="bg-gradient-to-r from-primary to-primary-dim text-on-primary-fixed px-4 py-1.5 rounded-lg font-bold text-xs uppercase tracking-wider shadow-lg shadow-primary/10">
+                        Share Canvas
+                    </button>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-primary/20" data-alt="Close-up portrait of a professional man with a neutral expression in a high-tech studio environment with soft blue rim lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDvhqXAlBvcYn_qMZTwkXwvxtzWlD46eHK7Mosrcls-yQ6DCdsvu4giQE6w45dPahSEruXDaGUPHma5f_rFG_TeS7H3wwFPYrstvEN5vHFo0F-npyOVe6zn4QRZAgt2sP5S8f2NmOeR-_OPIBrfUrCyRj9JgFe138fcrNbbuJUtN2J9dvZ0A1WIvWfMOe99BZRuimKlqWyAKVX7sOJXXXNVK5LI1o-R1A4JUEwekDSA0mH4noHQE_6ZXxHI7MHh9o-7FmVOYlMZGpc"/>
+</div>
+</div>
+</header>
+<!-- Split Screen Layout -->
+<div class="flex flex-1 overflow-hidden">
+<!-- Dashboard Canvas (70%) -->
+<section class="w-[70%] h-full p-6 overflow-y-auto bg-surface-container scroll-smooth hide-scrollbar">
+<div class="canvas-grid">
+<!-- Line Chart Panel: CPU Usage -->
+<div class="col-span-8 bg-surface-container-high p-5 rounded-xl border border-outline-variant/5 group relative">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center space-x-3">
+<div class="w-2 h-4 bg-primary rounded-full"></div>
+<h3 class="font-headline font-bold text-on-surface">Service CPU Usage (%)</h3>
+</div>
+<div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-zinc-500 cursor-pointer hover:text-white">drag_indicator</span>
+<span class="material-symbols-outlined text-zinc-500 cursor-pointer hover:text-white">more_vert</span>
+</div>
+</div>
+<div class="h-64 relative">
+<img class="w-full h-full object-cover rounded-lg opacity-40 mix-blend-screen" data-alt="High-contrast dark mode UI chart showing multiple undulating neon line graphs with data points and glowing soft shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbZX9ve4r7yuR55LOBSwnQlI-9HvVJqJQQWXlpabE-i8To1IXtWeZVrdOZnZgxpEXWAAvP4JGQ6ZTPVWd1Cvgy5LY1QSBu3hEkiGbZVA1f4xCMrHsJoH6FQiMmgf1n54imDfvF0lZaVZ61HUmn50bR6bNzQYvn6StVcsenGNEgGXGtEYqtSlKYMR3q5Tx21Njj6xG8XOddvEg-E5P1C5gLsLYwZZyD1G9PXT-ebFQWB-wOfX9c45ulG9KcsOePtETkfM2cxAYKXKg"/>
+<div class="absolute inset-0 flex items-end justify-between px-2 pb-2 pointer-events-none">
+<div class="text-[10px] text-zinc-500">00:00</div>
+<div class="text-[10px] text-zinc-500">06:00</div>
+<div class="text-[10px] text-zinc-500">12:00</div>
+<div class="text-[10px] text-zinc-500">18:00</div>
+<div class="text-[10px] text-zinc-500 text-primary font-bold">NOW</div>
+</div>
+</div>
+</div>
+<!-- Bar Chart Panel: Memory Usage -->
+<div class="col-span-4 bg-surface-container-high p-5 rounded-xl border border-outline-variant/5 group">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center space-x-3">
+<div class="w-2 h-4 bg-secondary rounded-full"></div>
+<h3 class="font-headline font-bold text-on-surface">Memory Alloc</h3>
+</div>
+</div>
+<div class="h-64 flex items-end justify-around space-x-2">
+<div class="w-full bg-surface-container-highest rounded-t-md relative group/bar h-[40%]">
+<div class="absolute bottom-0 w-full bg-secondary rounded-t-md h-1/2 group-hover/bar:bg-secondary-fixed transition-colors"></div>
+</div>
+<div class="w-full bg-surface-container-highest rounded-t-md relative h-[65%]">
+<div class="absolute bottom-0 w-full bg-secondary rounded-t-md h-3/4"></div>
+</div>
+<div class="w-full bg-surface-container-highest rounded-t-md relative h-[90%]">
+<div class="absolute bottom-0 w-full bg-error rounded-t-md h-full shadow-[0_0_15px_rgba(255,110,132,0.3)]"></div>
+</div>
+<div class="w-full bg-surface-container-highest rounded-t-md relative h-[50%]">
+<div class="absolute bottom-0 w-full bg-secondary rounded-t-md h-1/2"></div>
+</div>
+</div>
+<div class="mt-4 flex justify-between text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
+<span>Auth</span>
+<span>DB</span>
+<span>API</span>
+<span>Web</span>
+</div>
+</div>
+<!-- New Row: Network Throughput -->
+<div class="col-span-7 bg-surface-container-high p-5 rounded-xl border border-outline-variant/5 group">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center space-x-3">
+<div class="w-2 h-4 bg-tertiary rounded-full"></div>
+<h3 class="font-headline font-bold text-on-surface">Network Throughput (Gb/s)</h3>
+</div>
+<span class="material-symbols-outlined text-zinc-500 text-sm">settings_input_antenna</span>
+</div>
+<div class="h-48 relative">
+<img class="w-full h-full object-cover rounded-lg opacity-30 hue-rotate-[270deg] grayscale invert contrast-125 brightness-150" data-alt="Dynamic glowing line chart showing network activity with high peak frequencies" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDbZX9ve4r7yuR55LOBSwnQlI-9HvVJqJQQWXlpabE-i8To1IXtWeZVrdOZnZgxpEXWAAvP4JGQ6ZTPVWd1Cvgy5LY1QSBu3hEkiGbZVA1f4xCMrHsJoH6FQiMmgf1n54imDfvF0lZaVZ61HUmn50bR6bNzQYvn6StVcsenGNEgGXGtEYqtSlKYMR3q5Tx21Njj6xG8XOddvEg-E5P1C5gLsLYwZZyD1G9PXT-ebFQWB-wOfX9c45ulG9KcsOePtETkfM2cxAYKXKg"/>
+<div class="absolute inset-0 flex flex-col justify-between py-2">
+<div class="flex justify-between border-b border-white/5 pb-1"><span class="text-[9px] text-zinc-600">1.2 Gb/s</span></div>
+<div class="flex justify-between border-b border-white/5 pb-1"><span class="text-[9px] text-zinc-600">0.8 Gb/s</span></div>
+<div class="flex justify-between border-b border-white/5 pb-1"><span class="text-[9px] text-zinc-600">0.4 Gb/s</span></div>
+<div class="flex justify-between border-b border-white/5 pb-1"><span class="text-[9px] text-zinc-600">0.0 Gb/s</span></div>
+</div>
+</div>
+</div>
+<!-- New Row: Error Rate Table -->
+<div class="col-span-5 bg-surface-container-high p-5 rounded-xl border border-outline-variant/5">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center space-x-3">
+<div class="w-2 h-4 bg-error rounded-full"></div>
+<h3 class="font-headline font-bold text-on-surface">Error Rate by Service</h3>
+</div>
+<span class="px-2 py-0.5 rounded bg-error/10 text-error text-[10px] font-bold">CRITICAL</span>
+</div>
+<div class="space-y-4">
+<div class="flex items-center justify-between text-xs pb-2 border-b border-white/5 font-bold text-zinc-500 uppercase tracking-wider">
+<span>Service</span>
+<span>Rate</span>
+<span>Trend</span>
+</div>
+<div class="flex items-center justify-between group">
+<span class="text-sm text-zinc-300">auth-service</span>
+<span class="text-sm font-mono text-error font-bold">4.21%</span>
+<span class="material-symbols-outlined text-error text-sm">trending_up</span>
+</div>
+<div class="flex items-center justify-between group">
+<span class="text-sm text-zinc-300">payment-api</span>
+<span class="text-sm font-mono text-zinc-400">0.02%</span>
+<span class="material-symbols-outlined text-secondary text-sm">trending_flat</span>
+</div>
+<div class="flex items-center justify-between group">
+<span class="text-sm text-zinc-300">data-ingest</span>
+<span class="text-sm font-mono text-secondary font-bold">0.11%</span>
+<span class="material-symbols-outlined text-secondary text-sm">trending_down</span>
+</div>
+<div class="flex items-center justify-between group">
+<span class="text-sm text-zinc-300">notification-svc</span>
+<span class="text-sm font-mono text-zinc-400">0.00%</span>
+<span class="material-symbols-outlined text-zinc-500 text-sm">remove</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- AI Chat Panel (30%) -->
+<section class="w-[30%] bg-surface-container-low border-l border-white/5 flex flex-col">
+<!-- Header -->
+<div class="p-6 border-b border-white/5 flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="w-8 h-8 rounded-full bg-gradient-to-tr from-tertiary to-tertiary-dim flex items-center justify-center">
+<span class="material-symbols-outlined text-black text-sm" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+<div>
+<p class="text-xs font-bold text-tertiary uppercase tracking-tighter">AI Curator</p>
+<p class="text-[10px] text-zinc-500">LLM-4.5 Optimized</p>
+</div>
+</div>
+<button class="text-zinc-500 hover:text-white transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+</div>
+<!-- Chat History -->
+<div class="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
+<!-- User Message -->
+<div class="flex flex-col items-end space-y-2">
+<div class="bg-surface-variant p-4 rounded-xl rounded-tr-none max-w-[90%] border border-outline-variant/10 shadow-sm">
+<p class="text-sm text-zinc-200 leading-relaxed">Show me CPU usage and error rates for all services in production in the last 24h</p>
+</div>
+<span class="text-[10px] text-zinc-500 uppercase tracking-widest">You · 2m ago</span>
+</div>
+<!-- AI Response -->
+<div class="flex flex-col items-start space-y-3">
+<div class="bg-surface-container-high p-5 rounded-xl rounded-tl-none max-w-[95%] border-l-2 border-tertiary/40 shadow-xl relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-tertiary/20 to-transparent"></div>
+<p class="text-sm text-on-surface leading-relaxed">
+                                I've generated a dashboard with 3 panels showing CPU spikes in the <span class="text-tertiary font-bold">auth-service</span> and increased 5xx errors. 
+                            </p>
+<div class="mt-4 p-3 bg-surface-container-lowest rounded-lg border border-white/5 space-y-2">
+<div class="flex items-center justify-between">
+<span class="text-[11px] text-zinc-400 font-mono">auth-service-spike.png</span>
+<span class="material-symbols-outlined text-xs text-zinc-600">download</span>
+</div>
+<div class="h-24 bg-zinc-900 rounded-md overflow-hidden grayscale hover:grayscale-0 transition-all cursor-pointer">
+<img class="w-full h-full object-cover" data-alt="Dark abstract visualization of a server spike using vertical purple bars against a black background with soft digital noise" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEnr70K-7KsgmOs4Q_rPawKBSIQJ7o3FnAH-s2S6qqEMLFC649BmNmvrj90_qQeUytV4oVX_8LWxk6eufvPwU7bNbV1q0vjedgNRLMviELD1Y6FC-SS7tKq5xGBUxGUm0Tyr50_Z0t78A7A6AVelWc6LKTRLdxuBaaJNl-fNpR6-d7E77ZYBp-ok79eHYE2tq33XJhlF6Xo9pq9W-TPeP8TcfCS_7ti-KzSveIVkJgfv8OOysuZQo3t-pUXuMasgSM3gJe7C2unkk"/>
+</div>
+</div>
+</div>
+<span class="text-[10px] text-zinc-500 uppercase tracking-widest flex items-center space-x-2">
+<span class="material-symbols-outlined text-[12px] text-tertiary" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+<span>Curator · Just now</span>
+</span>
+</div>
+</div>
+<!-- Input Footer -->
+<div class="p-6 bg-surface-container-low border-t border-white/5 space-y-4">
+<!-- Suggestion Chips -->
+<div class="flex flex-wrap gap-2">
+<button class="px-3 py-1.5 rounded-full bg-surface-bright text-[11px] font-bold text-zinc-300 hover:text-white hover:bg-surface-container-highest transition-all border border-outline-variant/10">
+                            Identify root cause
+                        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-bright text-[11px] font-bold text-zinc-300 hover:text-white hover:bg-surface-container-highest transition-all border border-outline-variant/10">
+                            Create alert
+                        </button>
+<button class="px-3 py-1.5 rounded-full bg-surface-bright text-[11px] font-bold text-zinc-300 hover:text-white hover:bg-surface-container-highest transition-all border border-outline-variant/10">
+                            Generate report
+                        </button>
+</div>
+<!-- Command Bar -->
+<div class="relative group">
+<input class="w-full bg-surface-bright border-none ring-1 ring-white/5 focus:ring-tertiary/50 rounded-xl py-4 pl-5 pr-14 text-sm text-white placeholder-zinc-500 transition-all outline-none" placeholder="Ask AI to investigate..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-tertiary rounded-lg flex items-center justify-center text-on-tertiary-fixed shadow-lg shadow-tertiary/20 hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-sm">arrow_upward</span>
+</button>
+</div>
+<p class="text-[10px] text-center text-zinc-600">Press <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-white/10">⌘</kbd> + <kbd class="px-1.5 py-0.5 bg-zinc-800 rounded border border-white/10">K</kbd> for quick actions</p>
+</div>
+</section>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,315 @@
+<html><head>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/></head><body class="dark overflow-hidden font-body">```html
+<meta charset="utf-8"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        colors: {
+          "tertiary-fixed": "#ce9bff",
+          "primary-fixed-dim": "#8387ff",
+          "surface-container-low": "#131313",
+          "on-secondary-fixed": "#004840",
+          "tertiary": "#c180ff",
+          "tertiary-container": "#af5cfe",
+          "primary-fixed": "#9396ff",
+          "on-tertiary-fixed-variant": "#560094",
+          "surface": "#0e0e0e",
+          "on-tertiary": "#33005b",
+          "inverse-on-surface": "#565554",
+          "on-primary": "#0f00a4",
+          "surface-container-highest": "#262626",
+          "primary": "#a3a6ff",
+          "surface-container-lowest": "#000000",
+          "surface-tint": "#a3a6ff",
+          "on-surface": "#ffffff",
+          "inverse-primary": "#494bd7",
+          "error": "#ff6e84",
+          "surface-variant": "#262626",
+          "inverse-surface": "#fcf8f8",
+          "outline-variant": "#494847",
+          "primary-container": "#9396ff",
+          "on-secondary": "#005c52",
+          "outline": "#777575",
+          "surface-bright": "#2c2c2c",
+          "surface-container": "#1a1919",
+          "on-background": "#ffffff",
+          "secondary": "#62fae3",
+          "on-primary-container": "#0a0081",
+          "on-primary-fixed-variant": "#0e009d",
+          "surface-container-high": "#201f1f",
+          "surface-dim": "#0e0e0e",
+          "on-error-container": "#ffb2b9",
+          "secondary-fixed-dim": "#50ebd5",
+          "tertiary-dim": "#9c48ea",
+          "on-surface-variant": "#adaaaa",
+          "secondary-dim": "#50ebd5",
+          "error-dim": "#d73357",
+          "error-container": "#a70138",
+          "on-error": "#490013",
+          "on-tertiary-container": "#000000",
+          "background": "#0e0e0e",
+          "on-secondary-container": "#dcfff7",
+          "on-primary-fixed": "#000000",
+          "secondary-fixed": "#62fae3",
+          "tertiary-fixed-dim": "#c488ff",
+          "on-tertiary-fixed": "#270048",
+          "primary-dim": "#6063ee",
+          "on-secondary-fixed-variant": "#00675c"
+        },
+        fontFamily: {
+          "headline": ["Manrope"],
+          "body": ["Inter"],
+          "label": ["Inter"]
+        },
+        borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+      },
+    },
+  }
+</script>
+<style>
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+  }
+  body {
+    background-color: #0e0e0e;
+    color: #ffffff;
+    font-family: 'Inter', sans-serif;
+  }
+  .glass-panel {
+    background: rgba(44, 44, 44, 0.6);
+    backdrop-filter: blur(20px);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+</style>
+<!-- SideNavBar Anchor -->
+<aside class="fixed left-0 top-0 h-full z-40 flex flex-col h-screen w-20 hover:w-64 transition-all duration-300 ease-in-out border-none bg-[#131313] dark:bg-zinc-900 group font-['Manrope'] antialiased tracking-tight">
+<div class="p-6 flex items-center gap-4">
+<div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary-container flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-on-primary text-xl" data-icon="auto_awesome" style="font-variation-settings: 'FILL' 1;">auto_awesome</span>
+</div>
+<span class="text-xl font-bold text-white tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Observability</span>
+</div>
+<nav class="flex-1 px-4 space-y-2 mt-4">
+<!-- Active Item: Alerts -->
+<a class="flex items-center gap-4 p-3 text-[#a3a6ff] bg-[#1a1919] rounded-lg scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="notifications_active" style="font-variation-settings: 'FILL' 1;">notifications_active</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity font-medium">Alerts</span>
+</a>
+<a class="flex items-center gap-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="dashboard">dashboard</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Dashboards</span>
+</a>
+<a class="flex items-center gap-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="description">description</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Reports</span>
+</a>
+<a class="flex items-center gap-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="explore">explore</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Explore</span>
+</a>
+</nav>
+<div class="px-4 py-6 space-y-2">
+<a class="flex items-center gap-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="settings">settings</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Settings</span>
+</a>
+<a class="flex items-center gap-4 p-3 text-zinc-500 hover:text-zinc-300 hover:bg-[#201f1f] transition-colors" href="#">
+<span class="material-symbols-outlined shrink-0" data-icon="help">help</span>
+<span class="opacity-0 group-hover:opacity-100 transition-opacity">Help</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Layout -->
+<div class="ml-20 flex flex-col h-screen">
+<!-- TopNavBar Anchor -->
+<header class="w-full h-16 sticky top-0 z-30 flex items-center justify-between px-6 bg-[#0e0e0e]/80 backdrop-blur-xl font-['Manrope'] text-sm font-medium">
+<div class="flex items-center gap-8">
+<span class="text-lg font-black text-white">The Observability Canvas</span>
+<div class="flex items-center gap-4 text-zinc-400">
+<span class="text-white font-semibold cursor-pointer">Last 24h</span>
+<span class="hover:text-white transition-colors cursor-pointer">Auto-refresh</span>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<button class="px-4 py-2 rounded-lg bg-[#201f1f] text-zinc-300 hover:text-white transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="share">share</span>
+          Share Canvas
+        </button>
+<div class="flex items-center gap-4 text-zinc-400">
+<span class="material-symbols-outlined hover:text-white transition-colors cursor-pointer" data-icon="history">history</span>
+<span class="material-symbols-outlined hover:text-white transition-colors cursor-pointer" data-icon="notifications">notifications</span>
+<img alt="User Profile" class="w-8 h-8 rounded-full border border-white/10" data-alt="Close up of a professional user avatar with a minimalist abstract pattern background in soft indigo and grey tones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1zpwjy672AZ98mwyXTRi743HLiFlr8LMYQlCLBr0eC_tUysnGV-KHFRyWJRp-IV_NI7L2_VerS1nd1owL1Ew7Hm4gIblBO18Y0fQq5gjk0uCGAEppjWHF9Z35PCe4zO_S1pqm12GQwk3c7YAIZznvLDhmBanvEOZ0wii_g_3XNNjqg9NNdj0Dbr3_ZFfkO-x3UDPi2UofntP_Gt9rPSb7slbs2vayqvtu8MqhoH2BWZ5zUdpfuBBDJF6mtF-Vn1Kmvvjh2-Q7c1M"/>
+</div>
+</div>
+</header>
+<!-- Canvas Workspace -->
+<main class="flex-1 flex overflow-hidden">
+<!-- Left Side: Alert Configuration (70%) -->
+<section class="w-[70%] bg-surface-container overflow-y-auto no-scrollbar p-8">
+<div class="max-w-4xl mx-auto space-y-10">
+<!-- Header -->
+<header class="space-y-2">
+<h1 class="text-4xl font-headline font-extrabold text-on-surface tracking-tight">Create Alert: High Error Rate</h1>
+<p class="text-on-surface-variant text-lg">Define operational thresholds and notification logic for service health.</p>
+</header>
+<!-- Configuration Grid -->
+<div class="grid grid-cols-12 gap-8">
+<!-- Condition Section -->
+<div class="col-span-12 space-y-4">
+<div class="flex items-center justify-between">
+<h3 class="font-headline font-bold text-xl flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="rule">rule</span>
+                  Condition
+                </h3>
+</div>
+<div class="bg-surface-container-high p-6 rounded-xl border-l-4 border-primary shadow-sm">
+<div class="flex flex-wrap items-center gap-3 text-lg font-medium text-white">
+<span>If</span>
+<div class="bg-surface-bright px-3 py-1 rounded-lg text-primary">Error Rate</div>
+<span>is greater than</span>
+<div class="bg-surface-bright px-3 py-1 rounded-lg text-primary">5%</div>
+<span>for at least</span>
+<div class="bg-surface-bright px-3 py-1 rounded-lg text-primary">5m</div>
+</div>
+</div>
+</div>
+<!-- Severity Section -->
+<div class="col-span-12 md:col-span-5 space-y-4">
+<h3 class="font-headline font-bold text-xl flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary" data-icon="priority_high">priority_high</span>
+                Severity
+              </h3>
+<div class="flex flex-wrap gap-3">
+<button class="px-5 py-3 rounded-xl bg-error/20 border-2 border-error text-error font-bold flex flex-col items-center justify-center min-w-[70px]">
+<span class="text-xs uppercase tracking-widest opacity-70">P0</span>
+<span class="text-sm">Critical</span>
+</button>
+<button class="px-5 py-3 rounded-xl bg-surface-container-high text-on-surface-variant font-bold flex flex-col items-center justify-center min-w-[70px] hover:bg-surface-bright transition-colors">
+<span class="text-xs uppercase tracking-widest opacity-70">P1</span>
+<span class="text-sm">High</span>
+</button>
+<button class="px-5 py-3 rounded-xl bg-surface-container-high text-on-surface-variant font-bold flex flex-col items-center justify-center min-w-[70px] hover:bg-surface-bright transition-colors">
+<span class="text-xs uppercase tracking-widest opacity-70">P2</span>
+<span class="text-sm">Med</span>
+</button>
+<button class="px-5 py-3 rounded-xl bg-surface-container-high text-on-surface-variant font-bold flex flex-col items-center justify-center min-w-[70px] hover:bg-surface-bright transition-colors">
+<span class="text-xs uppercase tracking-widest opacity-70">P3</span>
+<span class="text-sm">Low</span>
+</button>
+</div>
+</div>
+<!-- Preview Section (Visual Data) -->
+<div class="col-span-12 md:col-span-7 space-y-4">
+<h3 class="font-headline font-bold text-xl flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary" data-icon="monitoring">monitoring</span>
+                Preview (Past 24h)
+              </h3>
+<div class="bg-surface-container-high p-4 rounded-xl h-48 relative overflow-hidden flex items-end">
+<!-- Abstract Data Viz Placeholder -->
+<div class="absolute inset-0 p-4 opacity-30 flex items-center justify-center">
+<img class="w-full h-full object-cover rounded-lg" data-alt="Minimalist line chart with glowing neon secondary color lines and a horizontal dashed error color threshold line over a dark charcoal background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlMPpBH7xDXopszIQbF9wwWKnxJwzqqw88D135KgMwzZHNN5maAEX42swsgINxxCWRSMMQUJRX_NAg185s8lVWMNYmvSzLAN7SNnd2XcaeL6a-XKuutYtwQ4m-rbwVW9iSPPaa7EPJ_Tawb0ita8e_O_SHRJzpmRWhqHWcOxp5NhhXU2FWn6eWMIhuG1AtBg2VFF59VnmOQMjb5UiYW0evxKc-7ip3vcVB82iFWLSovihrExaTWLqPGgAa81QpjwNkvB8atGq2HbI"/>
+</div>
+<!-- Threshold Line overlay -->
+<div class="absolute top-[35%] left-0 w-full h-[1px] bg-error border-t border-dashed border-error/50 z-10 flex items-center px-4">
+<span class="bg-error text-on-primary text-[10px] font-bold px-1 rounded transform -translate-y-1/2">THRESHOLD 5%</span>
+</div>
+<div class="w-full h-full flex items-end gap-1 px-2 z-0">
+<div class="w-full h-[40%] bg-surface-bright rounded-t-sm opacity-20"></div>
+<div class="w-full h-[60%] bg-surface-bright rounded-t-sm opacity-20"></div>
+<div class="w-full h-[45%] bg-surface-bright rounded-t-sm opacity-20"></div>
+<div class="w-full h-[70%] bg-error/40 rounded-t-sm"></div>
+<div class="w-full h-[85%] bg-error/40 rounded-t-sm"></div>
+<div class="w-full h-[55%] bg-surface-bright rounded-t-sm opacity-20"></div>
+<div class="w-full h-[40%] bg-surface-bright rounded-t-sm opacity-20"></div>
+</div>
+</div>
+</div>
+<!-- Notification Settings -->
+<div class="col-span-12 space-y-4">
+<h3 class="font-headline font-bold text-xl flex items-center gap-2">
+<span class="material-symbols-outlined text-tertiary-fixed" data-icon="campaign">campaign</span>
+                Notification Settings
+              </h3>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="flex items-center justify-between p-4 bg-surface-container-high rounded-xl hover:bg-surface-bright transition-all group cursor-pointer border border-transparent hover:border-primary/20">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary" data-icon="forum">forum</span>
+<span class="font-medium">Slack</span>
+</div>
+<div class="w-10 h-5 bg-primary rounded-full relative">
+<div class="absolute right-0.5 top-0.5 w-4 h-4 bg-on-primary rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-high rounded-xl hover:bg-surface-bright transition-all group cursor-pointer border border-transparent hover:border-primary/20">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary" data-icon="notifications_active">notifications_active</span>
+<span class="font-medium">PagerDuty</span>
+</div>
+<div class="w-10 h-5 bg-primary rounded-full relative">
+<div class="absolute right-0.5 top-0.5 w-4 h-4 bg-on-primary rounded-full"></div>
+</div>
+</div>
+<div class="flex items-center justify-between p-4 bg-surface-container-high rounded-xl hover:bg-surface-bright transition-all group cursor-pointer border border-transparent hover:border-primary/20">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-primary" data-icon="mail">mail</span>
+<span class="font-medium">Email</span>
+</div>
+<div class="w-10 h-5 bg-surface-variant rounded-full relative">
+<div class="absolute left-0.5 top-0.5 w-4 h-4 bg-on-surface-variant rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- CTA -->
+</div>
+</div>
+</section>
+<!-- Right Side: AI Chat Panel (30%) -->
+<aside class="w-[30%] bg-surface-container-low flex flex-col border-l border-white/5">
+<div class="p-6 border-b border-white/5 flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="smart_toy" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+<span class="font-headline font-bold">AI Curator</span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-white" data-icon="close">close</span>
+</div>
+<div class="flex-1 overflow-y-auto no-scrollbar p-6 space-y-6">
+<!-- User Prompt -->
+<div class="flex flex-col items-end space-y-2">
+<div class="bg-surface-variant p-4 rounded-xl rounded-tr-none max-w-[90%] text-sm leading-relaxed text-on-surface">
+              Set up a P1 alert for the checkout-service if error rate goes above 5%
+            </div>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">You • Just now</span>
+</div>
+<!-- AI Response -->
+<div class="flex flex-col items-start space-y-2">
+<div class="bg-surface-container-high p-5 rounded-xl rounded-tl-none max-w-[90%] text-sm leading-relaxed border-t border-l border-primary/20 relative">
+<div class="absolute -left-1 -top-1 w-2 h-2 bg-primary rounded-full blur-[2px]"></div>
+              I've configured the alert for you. You can review the thresholds and notification channels on the left. I've selected <span class="text-tertiary font-bold">P1 Severity</span> and enabled <span class="text-primary font-bold">Slack + PagerDuty</span> as requested.
+            </div>
+<span class="text-[10px] text-on-surface-variant uppercase font-bold tracking-widest">AI Curator • Just now</span>
+</div>
+</div>
+<!-- Input Area -->
+<div class="p-6">
+<div class="relative">
+<input class="w-full bg-surface-bright rounded-2xl py-4 px-6 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-on-surface-variant/50" placeholder="Refine alert or ask AI..." type="text"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary shadow-lg">
+<span class="material-symbols-outlined text-sm" data-icon="send">send</span>
+</button>
+</div>
+<p class="text-[10px] text-center mt-4 text-on-surface-variant opacity-50 uppercase tracking-widest">Press Enter to chat</p>
+</div>
+</aside>
+</main>
+</div>
+
+```</body></html>
