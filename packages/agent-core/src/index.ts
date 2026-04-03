@@ -12,6 +12,8 @@ export * from './case-library/index.js';
 export * from './postmortem/index.js';
 export * from './scheduled/index.js';
 export * from './alerting/index.js';
+export * from './runtime/index.js';
+export * from './verification/index.js';
 
 // Dashboard agents are exported under a namespace-style prefix to avoid name conflicts
 // with domain-level agents (e.g. InvestigationAgent exists in both).

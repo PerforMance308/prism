@@ -106,6 +106,7 @@ export type DashboardSseEvent =
   | { type: 'panel_modified'; panelId: string; patch: Partial<PanelConfig> }
   | { type: 'variable_added'; variable: DashboardVariable }
   | { type: 'investigation_report'; report: InvestigationReport }
+  | { type: 'verification_report'; report: { status: string; targetKind: string; summary: string; issues: Array<{ code: string; severity: string; message: string; artifactKind: string; artifactId?: string }>; checksRun: string[] } }
   | { type: 'reply'; content: string }
   | { type: 'done'; messageId: string }
   | { type: 'error'; message: string };

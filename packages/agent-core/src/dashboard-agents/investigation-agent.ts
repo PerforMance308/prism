@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { LLMGateway } from '@agentic-obs/llm-gateway'
 import { createLogger } from '@agentic-obs/common'
+import { agentRegistry } from '../runtime/agent-registry.js'
 import type {
   PanelConfig,
   PanelQuery,
@@ -84,6 +85,8 @@ const VALID_VISUALIZATIONS = new Set<string>([
 // -- Investigation Sub-Agent
 
 export class InvestigationAgent {
+  static readonly definition = agentRegistry.get('investigation-runner')!;
+
   constructor(private deps: InvestigationDeps) {}
 
   async investigate(input: InvestigationInput): Promise<InvestigationOutput> {

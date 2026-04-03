@@ -1,4 +1,5 @@
 import type { LLMGateway } from '@agentic-obs/llm-gateway'
+import { agentRegistry } from '../runtime/agent-registry.js'
 import type { AlertCondition, AlertSeverity } from '@agentic-obs/common'
 
 interface AlertRuleAgentDeps {
@@ -28,6 +29,8 @@ export interface AlertRuleContext {
 }
 
 export class AlertRuleAgent {
+  static readonly definition = agentRegistry.get('alert-rule-builder')!;
+
   constructor(private deps: AlertRuleAgentDeps) {}
 
   async generate(prompt: string, context?: AlertRuleContext): Promise<GeneratedAlertRule> {

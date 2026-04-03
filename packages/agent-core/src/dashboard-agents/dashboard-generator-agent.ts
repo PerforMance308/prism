@@ -6,11 +6,14 @@ import type {
   GenerateInput,
   GenerateOutput,
 } from './types.js'
+import { agentRegistry } from '../runtime/agent-registry.js'
 import { ResearchPhase } from './phases/research-phase.js'
 import { DiscoveryPhase } from './phases/discovery-phase.js'
 import { GenerationPhase } from './phases/generation-phase.js'
 
 export class DashboardGeneratorAgent {
+  static readonly definition = agentRegistry.get('dashboard-builder')!;
+
   private readonly research: ResearchPhase
   private readonly discovery: DiscoveryPhase
   private readonly generation: GenerationPhase
