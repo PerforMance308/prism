@@ -2,9 +2,12 @@
 import { DEFAULT_LLM_MODEL, type Evidence } from '@agentic-obs/common';
 import type { LLMGateway } from '@agentic-obs/llm-gateway';
 import { DEFAULT_RULES, criticalNotifyRule, classifyAndRecommendActions } from './rules.js';
+import { agentRegistry } from '../runtime/agent-registry.js';
 import type { ActionRule, ExecutionInput, ExecutionOutput } from './types.js';
 
 export class ExecutionAgent {
+  static readonly definition = agentRegistry.get('execution')!;
+
   readonly name = 'execution';
   private readonly rules: ActionRule[];
   private readonly maxActions: number;

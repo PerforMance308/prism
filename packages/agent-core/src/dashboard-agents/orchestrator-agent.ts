@@ -20,6 +20,8 @@ import { InvestigationAgent } from './investigation-agent.js'
 import { ActionExecutor } from './action-executor.js'
 import { AlertRuleAgent } from './alert-rule-agent.js'
 import { ReActLoop, type ReActStep } from './react-loop.js'
+import { VerifierAgent } from '../verification/verifier-agent.js'
+import { agentRegistry } from '../runtime/agent-registry.js'
 
 export interface OrchestratorDeps {
   gateway: LLMGateway
@@ -38,12 +40,15 @@ export interface OrchestratorDeps {
 }
 
 export class OrchestratorAgent {
+  static readonly definition = agentRegistry.get('intent-router')!;
+
   private readonly actionExecutor: ActionExecutor
   private readonly generatorAgent: DashboardGeneratorAgent
   private readonly panelAdderAgent: PanelAdderAgent
   private readonly investigationAgent?: InvestigationAgent
   private readonly alertRuleAgent: AlertRuleAgent
   private readonly reactLoop: ReActLoop
+  private readonly verifierAgent: VerifierAgent
 
   constructor(private deps: OrchestratorDeps) {
     this.actionExecutor = new ActionExecutor(deps.store, deps.sendEvent)
@@ -82,6 +87,8 @@ export class OrchestratorAgent {
       sendEvent: deps.sendEvent,
       maxTokenBudget: deps.maxTokenBudget,
     })
+
+    this.verifierAgent = new VerifierAgent()
 
     console.log(`[Orchestrator] init: prometheusUrl=${deps.prometheusUrl ? 'SET' : 'UNSET'}, investigationAgent=${this.investigationAgent ? 'YES' : 'NO'}`)
   }
@@ -146,6 +153,19 @@ export class OrchestratorAgent {
           if (result.variables && result.variables.length > 0) {
             for (const variable of result.variables) {
               await this.actionExecutor.execute(dashboardId, [{ type: 'add_variable', variable }])
+            }
+          }
+
+          // Run verification on the generated dashboard
+          const updatedDash = await this.deps.store.findById(dashboardId)
+          if (updatedDash) {
+            const verificationReport = await this.verifierAgent.verify('dashboard', updatedDash, {
+              prometheusUrl: this.deps.prometheusUrl,
+              prometheusHeaders: this.deps.prometheusHeaders,
+            })
+            this.deps.sendEvent({ type: 'verification_report', report: verificationReport })
+            if (verificationReport.status === 'failed') {
+              console.warn(`[Orchestrator] Dashboard verification failed: ${verificationReport.summary}`)
             }
           }
 
