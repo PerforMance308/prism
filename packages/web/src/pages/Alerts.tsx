@@ -312,7 +312,7 @@ export default function Alerts() {
     if (stateFilter !== 'all') params.set('state', stateFilter);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await apiClient.get<{ rules: AlertRule[]; total: number }>(`/alert-rules${qs}`);
-    if (!res.error) setRules(res.data.rules);
+    if (!res.error) setRules(res.data.rules ?? []);
     setLoading(false);
   }, [stateFilter]);
 
