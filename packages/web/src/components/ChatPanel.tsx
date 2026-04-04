@@ -53,26 +53,48 @@ function groupEvents(events: ChatEvent[]): Block[] {
 
 // Step processing
 
-// Data-driven step builder — no tool-name matching.
-// Every event carries its own displayText/summary; the UI just renders what it receives.
+// Phase-grouped step builder.
+// Multiple tool events that belong to the same phase merge into one step
+// with in-place status updates instead of adding new rows.
 
 interface StepRow {
   id: string;
+  phase: string;
   label: string;
   status: string;
   result?: { text: string; success: boolean };
   done: boolean;
+  subStepCount: number;
+}
+
+/**
+ * Derive a phase key from a tool name.
+ * Tools sharing a phase merge into one step row.
+ * Convention: tool names with common prefix group together.
+ */
+function phaseOf(tool: string): string {
+  // Underscore-delimited prefix grouping
+  // discover_metrics, discover_labels, sample_metrics → discover
+  // investigate_plan, investigate_query, investigate_analyze → investigate
+  // generate_group, generate_panels → generate
+  // panel_adder_generate, panel_adder_critic → panel_adder
+  // web_search → research (special case since research agent calls it)
+  if (tool === 'web_search') return 'research';
+  if (tool === 'sample_metrics') return 'discover';
+  if (tool === 'validate_query' || tool === 'fix_query') return 'generate';
+  if (tool === 'critic' || tool === 'build_progress') return 'generate';
+
+  const parts = tool.split('_');
+  return parts.length > 1 ? parts.slice(0, -1).join('_') : tool;
 }
 
 function buildSteps(events: ChatEvent[]): { steps: StepRow[]; preStatus: string | null } {
   const steps: StepRow[] = [];
-  // Map from tool name to its step (for pairing tool_call → tool_result)
-  const openSteps = new Map<string, StepRow>();
+  const phaseMap = new Map<string, StepRow>();
   let preStatus: string | null = null;
 
   for (const evt of events) {
     if (evt.kind === 'thinking') {
-      // Update last active step, or show as pre-status if no steps yet
       const active = [...steps].reverse().find((s) => !s.done);
       if (active) {
         active.status = evt.content ?? active.status;
@@ -84,26 +106,42 @@ function buildSteps(events: ChatEvent[]): { steps: StepRow[]; preStatus: string 
 
     if (evt.kind === 'tool_call') {
       const tool = evt.tool ?? 'unknown';
-      const label = evt.content ?? TOOL_LABELS[tool] ?? tool;
-      const step: StepRow = {
-        id: evt.id,
-        label,
-        status: evt.content ?? '',
-        done: false,
-      };
-      steps.push(step);
-      openSteps.set(tool, step);
+      const phase = phaseOf(tool);
+      const displayText = evt.content ?? TOOL_LABELS[tool] ?? tool;
+
+      const existing = phaseMap.get(phase);
+      if (existing && !existing.done) {
+        // In-place update: same phase, just update status
+        existing.status = displayText;
+        existing.subStepCount++;
+      } else {
+        // New phase → new step row
+        const step: StepRow = {
+          id: evt.id,
+          phase,
+          label: displayText,
+          status: displayText,
+          done: false,
+          subStepCount: 1,
+        };
+        steps.push(step);
+        phaseMap.set(phase, step);
+      }
       continue;
     }
 
     if (evt.kind === 'tool_result') {
       const tool = evt.tool ?? 'unknown';
-      const match = openSteps.get(tool);
+      const phase = phaseOf(tool);
+      const match = phaseMap.get(phase);
       if (match) {
-        match.result = { text: evt.content ?? '', success: evt.success !== false };
         match.status = evt.content ?? match.status;
-        match.done = true;
-        openSteps.delete(tool);
+        // Phase is done when a "summary" result arrives (not intermediate progress)
+        // Mark done if the result's tool matches the phase directly
+        if (tool === phase || match.subStepCount <= 1) {
+          match.result = { text: evt.content ?? '', success: evt.success !== false };
+          match.done = true;
+        }
       }
       continue;
     }
