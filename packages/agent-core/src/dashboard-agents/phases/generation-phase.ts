@@ -26,6 +26,18 @@ const VALID_VISUALIZATIONS = new Set<string>([
   'heatmap', 'pie', 'histogram', 'status_timeline',
 ])
 
+/** Enforce reasonable panel width based on visualization type */
+function clampWidth(panel: RawPanelSpec): number {
+  const w = panel.width ?? 6;
+  const viz = panel.visualization;
+  // Small panels: stat, gauge → max 4
+  if (viz === 'stat' || viz === 'gauge') return Math.min(w, 4);
+  // Medium panels: pie, bar, histogram, table → max 6
+  if (viz === 'pie' || viz === 'bar' || viz === 'histogram' || viz === 'table') return Math.min(w, 6);
+  // Full width only for: time_series, heatmap, status_timeline
+  return w;
+}
+
 export class GenerationPhase {
   constructor(private deps: GeneratorDeps) {}
 
@@ -254,7 +266,9 @@ ONLY return the JSON array without markdown.`
       })
       // Fix invalid JSON escape sequences from LLM (e.g. \s, \d in PromQL regex)
       const parsed = parseLlmJson(resp.content) as unknown
-      return Array.isArray(parsed) ? parsed as RawPanelSpec[] : []
+      const panels = Array.isArray(parsed) ? parsed as RawPanelSpec[] : []
+      // Enforce reasonable widths — LLM often sets everything to 12
+      return panels.map((p) => ({ ...p, width: clampWidth(p) }))
     }
     catch (err) {
       log.warn({ err }, 'generateGroup failed')
