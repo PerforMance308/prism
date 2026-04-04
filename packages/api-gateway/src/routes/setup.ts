@@ -294,6 +294,25 @@ export function createSetupRouter(): Router {
     log.error({ err }, 'failed to load config');
   });
 
+  // GET /api/setup/config — returns current config (API keys masked)
+  router.get('/config', (_req: Request, res: Response) => {
+    const cfg = { ...inMemoryConfig };
+    // Mask sensitive fields
+    if (cfg.llm) {
+      cfg.llm = {
+        ...cfg.llm,
+        apiKey: cfg.llm.apiKey ? '••••••' + cfg.llm.apiKey.slice(-4) : undefined,
+        tokenHelperCommand: cfg.llm.tokenHelperCommand,
+      };
+    }
+    cfg.datasources = cfg.datasources.map((ds) => ({
+      ...ds,
+      apiKey: ds.apiKey ? '••••••' + ds.apiKey.slice(-4) : undefined,
+      password: ds.password ? '••••••' : undefined,
+    }));
+    res.json(cfg);
+  });
+
   // GET /api/setup/status
   router.get('/status', (_req: Request, res: Response) => {
     res.json({

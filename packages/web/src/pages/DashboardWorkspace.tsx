@@ -52,7 +52,7 @@ function SaveDropdown({
     if (!open) return;
     void apiClient.get<Dashboard[]>('/dashboards').then((res) => {
       if (!res.error) {
-        const set = new Set(res.data.map((d: Dashboard) => d.folder).filter(Boolean) as string[]);
+        const set = new Set((Array.isArray(res.data) ? res.data : []).map((d: Dashboard) => d.folder).filter(Boolean) as string[]);
         setFolders([...set].sort());
       }
     });
