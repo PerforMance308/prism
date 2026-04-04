@@ -553,7 +553,7 @@ export default function DashboardPanelCard({
 
     switch (panel.visualization) {
       case 'time_series':
-        return <div className="px-3 pb-2"><TimeSeriesChart result={multiRangeData[0]} stackMode={panel.stackMode === 'normal' ? 'normal' : 'none'} /></div>;
+        return <div className="px-3 pb-2"><TimeSeriesChart result={multiRangeData[0]} stackMode={panel.stackMode === 'normal' ? 'normal' : 'none'} unit={panel.unit} /></div>;
       case 'stat': {
         const val = firstInstantValue(instantData);
         return <StatVisualization value={val} unit={panel.unit} />;
@@ -572,7 +572,7 @@ export default function DashboardPanelCard({
       }
       case 'table': {
         const tsData = isRangeViz ? multiRangeData[0] : transformInstantData(instantData!, activeQuery);
-        return <div className="px-3 pb-2"><TimeSeriesChart result={tsData} /></div>;
+        return <div className="px-3 pb-2"><TimeSeriesChart result={tsData} unit={panel.unit} /></div>;
       }
       case 'pie': {
         const items = instantToPieItems(instantData);
