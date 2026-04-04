@@ -60,6 +60,7 @@ export class GenerationPhase {
 
   async generateAndCriticLoop(
     group: PanelGroup,
+    allGroups: PanelGroup[],
     input: GenerateInput,
     research: ResearchResult | undefined,
     discovery: DiscoveryResult | undefined,
@@ -76,7 +77,7 @@ export class GenerationPhase {
         displayText: `Generating "${group.label}"${round > 0 ? ` (revision ${round})` : ''}`,
       })
 
-      rawPanels = await this.generateGroup(group, input, research, discovery, startRow, feedback)
+      rawPanels = await this.generateGroup(group, allGroups, input, research, discovery, startRow, feedback)
 
       this.deps.sendEvent?.({
         type: 'tool_result',
@@ -92,7 +93,7 @@ export class GenerationPhase {
         displayText: `Reviewing "${group.label}" (${rawPanels.length} panels)`,
       })
 
-      feedback = await this.critique(rawPanels, group, input)
+      feedback = await this.critique(rawPanels, group, allGroups, input)
 
       this.deps.sendEvent?.({
         type: 'tool_result',
@@ -196,6 +197,7 @@ export class GenerationPhase {
   // Generator
   private async generateGroup(
     group: PanelGroup,
+    allGroups: PanelGroup[],
     input: GenerateInput,
     research: ResearchResult | undefined,
     discovery: DiscoveryResult | undefined,
@@ -219,12 +221,21 @@ export class GenerationPhase {
       : ''
 
     const panelSpecsText = group.panelSpecs.map((s) => `- ${s.title} (${s.queryIntent}) (${s.visualization}) ${s.width}x${s.height}`).join('\n')
+    const sectionMap = allGroups
+      .map((g) => {
+        const specs = g.panelSpecs.map((s) => `${s.title}: ${s.queryIntent}`).join('; ')
+        return `- ${g.label} -> ${g.purpose}${specs ? ` | assigned coverage: ${specs}` : ''}${g.id === group.id ? ' [CURRENT SECTION]' : ''}`
+      })
+      .join('\n')
 
     const systemPrompt = `You are a PromQL expert generating dashboard panels for the "${group.label}" section.
 ${GENERATION_PRINCIPLES}
 
 ## Section Purpose
 ${group.purpose}
+
+## Full Dashboard Section Map
+${sectionMap}
 
 ## Panel Specifications
 ${panelSpecsText}
@@ -233,6 +244,7 @@ ${researchContext}${groundingContext}${feedbackSection}
 ## IMPORTANT
 Each panel spec above specifies its visualization type in parentheses. You MUST use exactly that visualization type.
 Do not change pie to time_series, do not change histogram to bar, etc.
+Treat the section map as a hard ownership map. This section should cover its assigned signals and should NOT recreate signals already assigned to other sections unless the perspective is clearly different.
 
 ## PromQL Rules
 - rate() on counters (*_total, *_count) with [5m]
@@ -302,14 +314,24 @@ ONLY return the JSON array without markdown.`
   private async critique(
     panels: RawPanelSpec[],
     group: PanelGroup,
+    allGroups: PanelGroup[],
     input: GenerateInput,
   ): Promise<CriticFeedback> {
+    const sectionMap = allGroups
+      .map((g) => {
+        const specs = g.panelSpecs.map((s) => `${s.title}: ${s.queryIntent}`).join('; ')
+        return `- ${g.label} -> ${g.purpose}${specs ? ` | assigned coverage: ${specs}` : ''}${g.id === group.id ? ' [CURRENT SECTION]' : ''}`
+      })
+      .join('\n')
+
     const systemPrompt = `You are a senior SRE reviewing dashboard panels for quality and correctness.
 
 ## Review Context
 Dashboard goal: ${input.goal}
 Section: ${group.label} -> ${group.purpose}
 Expected scope: ${input.scope ?? 'auto / inferred from the user request'}
+Full section map:
+${sectionMap}
 
 Treat the section label and purpose as a hard organizational boundary. If a panel's primary signal belongs to another theme, flag it as section_mismatch instead of approving it just because the query itself is valid.
 

@@ -95,9 +95,24 @@ interface Props {
   result: unknown;
   height?: number;
   stackMode?: 'none' | 'normal' | 'percent';
+  unit?: string;
 }
 
-export default function TimeSeriesChart({ result, height = 200, stackMode }: Props) {
+function formatValueWithUnit(v: number, unit?: string): string {
+  if (Number.isNaN(v)) return 'NaN';
+
+  if (unit === 'seconds') {
+    const abs = Math.abs(v);
+    if (abs > 0 && abs < 1) {
+      return `${(v * 1000).toFixed(abs < 0.01 ? 1 : 0)} ms`;
+    }
+    return abs < 10 ? `${v.toFixed(3)} s` : `${v.toFixed(2)} s`;
+  }
+
+  return formatValue(v);
+}
+
+export default function TimeSeriesChart({ result, height = 200, stackMode, unit }: Props) {
   if (isMultiQueryResult(result)) {
     const allSeries: ExtendedSeriesData[] = [];
     let totalSeries = 0;
@@ -114,10 +129,10 @@ export default function TimeSeriesChart({ result, height = 200, stackMode }: Pro
 
     const isInstant = allSeries.every((s) => s.points.length === 1);
     if (isInstant) {
-      return <InstantTable series={allSeries} totalSeries={totalSeries} />;
+      return <InstantTable series={allSeries} totalSeries={totalSeries} unit={unit} />;
     }
 
-    return <RechartsArea series={allSeries} totalSeries={totalSeries} height={height} stackMode={stackMode} />;
+    return <RechartsArea series={allSeries} totalSeries={totalSeries} height={height} stackMode={stackMode} unit={unit} />;
   }
 
   if (!isMetricEvidence(result)) return null;
@@ -129,19 +144,19 @@ export default function TimeSeriesChart({ result, height = 200, stackMode }: Pro
 
   const isInstant = series.every((s) => s.points.length === 1);
   if (isInstant) {
-    return <InstantTable series={series} totalSeries={totalSeries} />;
+    return <InstantTable series={series} totalSeries={totalSeries} unit={unit} />;
   }
 
-  return <RechartsArea series={series} totalSeries={totalSeries} height={height} stackMode={stackMode} />;
+  return <RechartsArea series={series} totalSeries={totalSeries} height={height} stackMode={stackMode} unit={unit} />;
 }
 
-function InstantTable({ series, totalSeries }: { series: ExtendedSeriesData[]; totalSeries: number }) {
+function InstantTable({ series, totalSeries, unit }: { series: ExtendedSeriesData[]; totalSeries: number; unit?: string }) {
   return (
     <div className="mt-2 bg-[#141420] rounded-lg p-3 space-y-1">
       {series.slice(0, 10).map((s, i) => (
         <div key={i} className="flex items-center justify-between text-xs gap-2">
           <span className="text-[#8888AA] truncate flex-1">{resolveLabel(s)}</span>
-          <span className="font-mono font-semibold text-[#E8E8ED]">{formatValue(s.points[0]?.value ?? 0)}</span>
+          <span className="font-mono font-semibold text-[#E8E8ED]">{formatValueWithUnit(s.points[0]?.value ?? 0, unit)}</span>
         </div>
       ))}
       {totalSeries > 10 && <div className="text-xs text-[#555570] mt-1">+{totalSeries - 10} more series</div>}
@@ -154,11 +169,13 @@ function RechartsArea({
   totalSeries,
   height,
   stackMode,
+  unit,
 }: {
   series: ExtendedSeriesData[];
   totalSeries: number;
   height: number;
   stackMode?: 'none' | 'normal' | 'percent';
+  unit?: string;
 }) {
   const displaySeries = series.slice(0, 10);
   const isStacked = stackMode === 'normal' || stackMode === 'percent';
@@ -241,7 +258,7 @@ function RechartsArea({
             tickLine={false}
           />
           <YAxis
-            tickFormatter={stackMode === 'percent' ? (v: number) => `${v.toFixed(0)}%` : formatValue}
+            tickFormatter={stackMode === 'percent' ? (v: number) => `${v.toFixed(0)}%` : (v: number) => formatValueWithUnit(v, unit)}
             tick={{ fill: '#8888AA', fontSize: 11 }}
             axisLine={{ stroke: '#2A2A3E' }}
             tickLine={false}
@@ -262,7 +279,7 @@ function RechartsArea({
                       <span className="text-[#E8E8ED] font-mono font-semibold ml-auto">
                         {stackMode === 'percent'
                           ? `${(entry.value as number).toFixed(1)}%`
-                          : formatValue(entry.value as number)}
+                          : formatValueWithUnit(entry.value as number, unit)}
                       </span>
                     </div>
                   ))}

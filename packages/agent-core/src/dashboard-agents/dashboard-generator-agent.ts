@@ -72,6 +72,7 @@ export class DashboardGeneratorAgent {
       plan.groups.map((group, i) =>
         this.generation.generateAndCriticLoop(
           group,
+          plan.groups,
           input,
           researchResult,
           discoveryResult,
