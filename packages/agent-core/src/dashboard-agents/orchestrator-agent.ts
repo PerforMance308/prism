@@ -729,10 +729,10 @@ ${historySection}${datasourceSection}
 ## Available Tools
 
 ## Sub-agents (for complex work - these handle research, discovery, and panel generation internally)
-- generate_dashboard(goal: string, scope?: "single"|"group"|"comprehensive") -> full dashboard generation or rebuilding dashboards.
-- add_panels(goal: string) -> add new panels to the existing dashboard. Use for granting or rebuilding dashboards.
-- investigate(goal: string) -> investigate a production issue using Prometheus data; generates evidence panels for report view.
-- create_alert_rule(prompt: string) -> create a Prometheus alert rule that notifies users when the user asks for alerting/troubleshooting conditions.
+- generate_dashboard(goal: string, scope?: "single"|"group"|"comprehensive") -> FULL dashboard generation with research, metric discovery, and multi-section panel generation. Use when the dashboard is empty or the user wants a comprehensive monitoring view. This is the DEFAULT for new dashboards.
+- add_panels(goal: string) -> add 1-3 specific panels to an EXISTING dashboard that already has panels. Only use for small incremental additions.
+- investigate(goal: string) -> investigate a production issue using real data; generates evidence panels and investigation report.
+- create_alert_rule(prompt: string) -> create an alert rule that notifies users when a metric crosses a threshold.
 
 ## Direct tools (immediate dashboard changes)
 - remove_panels(panelIds: string[]) -> remove panels by ID
@@ -748,33 +748,22 @@ ${historySection}${datasourceSection}
 ## Intent Classification
 CRITICAL: Classify the user's intent carefully. You have the ability to create alert rules via the create_alert_rule tool. NEVER tell the user you cannot set up alerts or notifications - use the create_alert_rule tool instead.
 
-### Key distinction:
-- generate_dashboard = user wants to BUILD/CREATE a monitoring dashboard (proactive setup)
-- investigate = user is ASKING ABOUT a PROBLEM or wants to DIAGNOSE an issue (reactive troubleshooting)
+### Intent Classification Rules
 
-Route to the appropriate tool:
+Choose the tool based on these rules IN ORDER:
 
-### Create/rebuild dashboard (user explicitly wants to create or set up monitoring) -> generate_dashboard
-Examples:
-- "Create a dashboard for my AKS cluster" -> build me a monitoring dashboard
-- "Set up observability for X" -> build a monitoring dashboard
+1. **generate_dashboard** — Use when the dashboard has 0 panels, OR when the user wants a broad/comprehensive monitoring view for a topic. This runs a full pipeline: research → metric discovery → multi-section generation.
+2. **add_panels** — Use ONLY when the dashboard already has panels AND the user wants to add a small incremental addition to the existing view.
+3. **investigate** — Use when the user describes a symptom, problem, or asks a diagnostic question about something going wrong.
+4. **create_alert_rule** — Use when the user wants to be notified in the future when a condition is met.
 
-### Investigate/troubleshoot (user describes a PROBLEM, asks why something is happening, or wants to diagnose) -> investigate
-Examples:
-- "Why are my server latency high?" -> investigate the error spike
-- "What is causing high CPU?" -> debug the issue
-NOTE: Any question starting with "why", "what's causing", "what's wrong", or describing a symptom/problem ALWAYS investigate, NOT generate_dashboard.
-IMPORTANT: If the user describes a condition they want to be informed about in the future:
-- "Notify me if CPU > 80% for 10 minutes" -> create_alert_rule
-- "Create an alert when the pod restarts" -> create_alert_rule
-- "Let me know if memory crosses threshold" -> create_alert_rule
-
-### Receive a notification or be alerted when a metric crosses a threshold or a state occurs -> create_alert_rule
-Patterns: the user specifies "alert/notify/condition threshold" to be monitored/detected/followed up. This includes any phrasing that implies "watch this for me and tell me when..."
-
-### Add panels -> add_panels
-- "Add a panel for 4xx rate" -> add new panel
-- "Add panels for memory" -> add panels for memory
+Decision logic:
+- Dashboard has 0 panels? → generate_dashboard (always)
+- User asks for metrics/monitoring/dashboard for a topic? → generate_dashboard
+- User says "add" or "also show" on a populated dashboard? → add_panels
+- User describes a problem or asks "why"? → investigate
+- User wants future notifications/alerts? → create_alert_rule
+${dashboard.panels.length === 0 ? '\n⚠️ THIS DASHBOARD HAS 0 PANELS — you MUST use generate_dashboard.\n' : ''}
 
 ### Modify panels/layout -> use direct tools
 - "Rename the CPU panel to..." -> modify_panel
