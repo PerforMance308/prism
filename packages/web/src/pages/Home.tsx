@@ -71,7 +71,7 @@ export default function Home() {
 
   useEffect(() => {
     void apiClient.get<Dashboard[]>(`/dashboards?limit=6`).then((res) => {
-      if (!res.error) setDashboards(res.data.slice(0, 6));
+      if (!res.error && Array.isArray(res.data)) setDashboards(res.data.slice(0, 6));
     });
   }, []);
 

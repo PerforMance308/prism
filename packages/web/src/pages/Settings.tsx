@@ -110,6 +110,22 @@ function LlmSection() {
   const [fetchingModels, setFetchingModels] = useState(false);
   const [modelsFetched, setModelsFetched] = useState(false);
 
+  // Load current config on mount
+  useEffect(() => {
+    void apiClient.get<{ llm?: LlmConfig }>('/setup/config').then((res) => {
+      if (!res.error && res.data?.llm) {
+        setConfig((prev) => ({
+          ...prev,
+          provider: (res.data.llm!.provider as LlmProvider) ?? prev.provider,
+          model: res.data.llm!.model ?? prev.model,
+          baseUrl: res.data.llm!.baseUrl ?? '',
+          region: (res.data.llm as any)?.region ?? '',
+          // Don't overwrite apiKey — it's masked from backend
+        }));
+      }
+    });
+  }, []);
+
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const provider = LLM_PROVIDERS.find((p) => p.value === config.provider) ?? LLM_PROVIDERS[0]!;
 
