@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { defaultAlertRuleStore } from './alert-rule-store.js';
-import { createLlmGateway } from './llm-factory.js';
-import { AlertRuleAgent } from './dashboard/agents/alert-rule-agent.js';
-import { getSetupConfig } from './setup.js';
+import { defaultAlertRuleStore } from '@agentic-obs/data-layer';
+import { AlertRuleService } from '../services/alert-rule-service.js';
+import { getWorkspaceId } from '../middleware/workspace-context.js';
 const router = Router();
+const alertRuleService = new AlertRuleService();
 // -- POST /api/alert-rules/generate - NL -> alert rule (no dashboard needed)
 // IMPORTANT: must be before /:id routes
 router.post('/generate', async (req, res, next) => {
@@ -13,39 +13,19 @@ router.post('/generate', async (req, res, next) => {
             res.status(400).json({ code: 'INVALID_INPUT', message: 'prompt is required' });
             return;
         }
-        const config = getSetupConfig();
-        if (!config.llm) {
-            res.status(503).json({ code: 'LLM_NOT_CONFIGURED', message: 'LLM not configured - complete Setup Wizard first' });
-            return;
+        const { rule } = await alertRuleService.generateFromPrompt(body.prompt.trim());
+        // Stamp workspace on generated rule
+        const workspaceId = getWorkspaceId(req);
+        if (workspaceId !== 'default') {
+            defaultAlertRuleStore.update(rule.id, { workspaceId, labels: { ...rule.labels, workspaceId } });
         }
-        const gateway = createLlmGateway(config.llm);
-        const model = config.llm.model || 'claude-sonnet-4-6';
-        const promDs = config.datasources.find((d) => d.type === 'prometheus' || d.type === 'victoria-metrics');
-        const prometheusUrl = promDs?.url;
-        const prometheusHeaders = {};
-        if (promDs?.username && promDs?.password) {
-            prometheusHeaders['Authorization'] = `Basic ${Buffer.from(`${promDs.username}:${promDs.password}`).toString('base64')}`;
-        }
-        else if (promDs?.apiKey) {
-            prometheusHeaders['Authorization'] = `Bearer ${promDs.apiKey}`;
-        }
-        const agent = new AlertRuleAgent({ gateway, model, prometheusUrl, prometheusHeaders });
-        const generated = await agent.generate(body.prompt.trim());
-        const rule = defaultAlertRuleStore.create({
-            name: generated.name,
-            description: generated.description,
-            originalPrompt: body.prompt.trim(),
-            condition: generated.condition,
-            evaluationIntervalSec: generated.evaluationIntervalSec,
-            severity: generated.severity,
-            labels: generated.labels,
-            createdBy: 'llm',
-            notificationPolicyId: undefined,
-            autoInvestigate: generated.autoInvestigate,
-        });
         res.status(201).json(rule);
     }
     catch (err) {
+        if (err?.message?.includes('LLM not configured')) {
+            res.status(503).json({ code: 'LLM_NOT_CONFIGURED', message: err.message });
+            return;
+        }
         next(err);
     }
 });
@@ -56,6 +36,7 @@ router.get('/', (req, res) => {
     const search = req.query['search'];
     const limit = req.query['limit'] ? parseInt(req.query['limit']) : undefined;
     const offset = req.query['offset'] ? parseInt(req.query['offset']) : undefined;
+    const workspaceId = getWorkspaceId(req);
     const results = defaultAlertRuleStore.findAll({
         state: state,
         severity,
@@ -63,6 +44,9 @@ router.get('/', (req, res) => {
         limit,
         offset,
     });
+    // Filter by workspace
+    results.list = results.list.filter((r) => (r.workspaceId ?? 'default') === workspaceId);
+    results.total = results.list.length;
     res.json(results);
 });
 router.get('/:id', (req, res) => {
@@ -79,6 +63,7 @@ router.post('/', (req, res) => {
         res.status(400).json({ code: 'INVALID_INPUT', message: 'name and condition are required' });
         return;
     }
+    const workspaceId = getWorkspaceId(req);
     const rule = defaultAlertRuleStore.create({
         name: body.name,
         description: body.description ?? '',
@@ -86,9 +71,10 @@ router.post('/', (req, res) => {
         condition: body.condition,
         evaluationIntervalSec: body.evaluationIntervalSec ?? 60,
         severity: body.severity ?? 'medium',
-        labels: body.labels ?? {},
+        labels: { ...body.labels, workspaceId },
         createdBy: body.createdBy ?? 'user',
         notificationPolicyId: body.notificationPolicyId,
+        workspaceId,
     });
     res.status(201).json(rule);
 });
@@ -153,8 +139,8 @@ router.post('/:id/investigate', async (req, res, next) => {
             res.json({ investigationId: rule.investigationId, existing: true });
             return;
         }
-        const dashboardStoreModule = await import('./dashboard/store.js');
-        const dashboard = dashboardStoreModule.defaultDashboardStore.create({
+        const { defaultDashboardStore } = await import('@agentic-obs/data-layer');
+        const dashboard = defaultDashboardStore.create({
             title: `Investigation for alert ${rule.name}`,
             description: `Investigation for alert: ${rule.condition.query} ${rule.condition.operator} ${rule.condition.threshold}`,
             prompt: '',

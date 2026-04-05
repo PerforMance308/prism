@@ -11,14 +11,11 @@
  */
 import { CorrelationEngine, AlertRuleEvaluator } from '@agentic-obs/agent-core';
 import { createWorkerQueueFromEnv } from '@agentic-obs/common';
-import { feedStore } from './routes/feed-store.js';
-import { incidentStore } from './routes/incident-store.js';
+import { feedStore, incidentStore, defaultAlertRuleStore, AlertRuleStoreProvider } from '@agentic-obs/data-layer';
 import { createProactivePipeline } from './proactive-pipeline.js';
 import { setPipelineRunning } from './routes/health.js';
 import { createLogger } from '@agentic-obs/common';
 import { PrometheusPromQlEvaluator } from './routes/alert-promql-adapter.js';
-import { AlertRuleStoreProvider } from './routes/alert-rule-provider-adapter.js';
-import { defaultAlertRuleStore } from './routes/alert-rule-store.js';
 import { getSetupConfig, ensureConfigLoaded } from './routes/setup.js';
 const log = createLogger('proactive-pipeline-runner');
 let started = false;
@@ -75,7 +72,9 @@ export async function runProactivePipeline() {
         void queue.enqueue('correlate', {
             symptoms: draft.symptoms,
             changes: draft.changes,
-        }, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
+        }, { attempts: 3, backoff: { type: 'exponential', delay: 1000 } }).catch((err) => {
+            log.error({ err: err instanceof Error ? err.message : err }, 'failed to enqueue correlation job');
+        });
     });
     pipeline.start();
     setPipelineRunning(true);

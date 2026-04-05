@@ -113,7 +113,9 @@ export function createWebhookRouter(bus) {
                     continue;
                 if (!sub.events.includes(eventType) && !sub.events.includes('*'))
                     continue;
-                void deliverWebhook(sub, eventType, event.payload, deliveryLog);
+                void deliverWebhook(sub, eventType, event.payload, deliveryLog).catch((err) => {
+                    log.error({ err: err instanceof Error ? err.message : err, url: sub.url, event: eventType }, 'webhook delivery threw unexpectedly');
+                });
             }
         }) ?? (() => { }));
     }

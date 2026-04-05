@@ -1,9 +1,8 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
-import { incidentStore, } from './incident-store.js';
-import { defaultInvestigationStore } from './investigation/store.js';
-import { postMortemStore as postmortemStore } from './post-mortem-store.js';
+import { incidentStore, defaultInvestigationStore, postMortemStore as postmortemStore, } from '@agentic-obs/data-layer';
+import { getWorkspaceId } from '../middleware/workspace-context.js';
 const VALID_STATUSES = ['open', 'mitigated', 'resolved'];
 const VALID_SEVERITIES = ['P1', 'P2', 'P3', 'P4'];
 export function createIncidentRouter(store = incidentStore, extras = {}) {
@@ -30,11 +29,13 @@ export function createIncidentRouter(store = incidentStore, extras = {}) {
                 res.status(400).json(err);
                 return;
             }
+            const workspaceId = getWorkspaceId(req);
             const incident = await store.create({
                 title: body.title.trim(),
                 severity: body.severity ?? 'P3',
                 services: body.services,
                 assignee: typeof body.assignee === 'string' ? body.assignee : undefined,
+                workspaceId,
             });
             res.status(201).json(incident);
         }
@@ -67,9 +68,10 @@ export function createIncidentRouter(store = incidentStore, extras = {}) {
         }
     });
     // GET /api/incidents - list all
-    router.get('/', requirePermission('incident:read'), async (_req, res, next) => {
+    router.get('/', requirePermission('incident:read'), async (req, res, next) => {
         try {
-            const all = (await store.findAll()).map((inc) => ({
+            const workspaceId = getWorkspaceId(req);
+            const all = (await store.findAll()).filter((inc) => (inc.workspaceId ?? 'default') === workspaceId).map((inc) => ({
                 id: inc.id,
                 title: inc.title,
                 severity: inc.severity,
@@ -91,6 +93,12 @@ export function createIncidentRouter(store = incidentStore, extras = {}) {
         try {
             const incident = await store.findById(req.params['id'] ?? '');
             if (!incident) {
+                const err = { code: 'NOT_FOUND', message: 'Incident not found' };
+                res.status(404).json(err);
+                return;
+            }
+            const workspaceId = getWorkspaceId(req);
+            if ((incident.workspaceId ?? 'default') !== workspaceId) {
                 const err = { code: 'NOT_FOUND', message: 'Incident not found' };
                 res.status(404).json(err);
                 return;

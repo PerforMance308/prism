@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
-import { LLMUnavailableError } from '@agentic-obs/common';
+import { createLogger, DEFAULT_LLM_MODEL, LLMUnavailableError } from '@agentic-obs/common';
+const log = createLogger('execution-agent');
 export class LLMExecutionAgent {
     llm;
     adapterRegistry;
@@ -14,7 +15,7 @@ export class LLMExecutionAgent {
         this.adapterRegistry = config.adapterRegistry;
         this.actionGuard = config.actionGuard;
         this.credentialResolver = config.credentialResolver;
-        this.model = config.model ?? 'claude-sonnet-4-6';
+        this.model = config.model ?? DEFAULT_LLM_MODEL;
         this.temperature = config.temperature ?? 0.1;
     }
     async plan(conclusion, context) {
@@ -146,11 +147,11 @@ export class LLMExecutionAgent {
         try {
             const dryRun = await adapter.dryRun(boundAction);
             if (dryRun.warnings.length > 0) {
-                console.warn('[ExecutionAgent] dryRun warnings:', dryRun.warnings);
+                log.warn({ warnings: dryRun.warnings }, 'dryRun warnings');
             }
         }
         catch (err) {
-            console.warn('[ExecutionAgent] dryRun failed (proceeding):', err);
+            log.warn({ err }, 'dryRun failed (proceeding)');
         }
         let result;
         try {

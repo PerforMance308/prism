@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -7,6 +7,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  ReferenceDot,
 } from 'recharts';
 
 interface TimeSeriesPoint {
@@ -84,7 +85,32 @@ function formatTime(ts: number): string {
 function seriesLabel(labels: Record<string, string>): string {
   const entries = Object.entries(labels).filter(([k]) => k !== '__name__');
   if (entries.length === 0) return labels.__name__ ?? 'series';
-  return entries.slice(0, 3).map(([, v]) => v).join(' / ');
+  // Show at most 3 label values, prefer shorter values (likely more meaningful like route, method vs long instance strings)
+  const sorted = entries.sort((a, b) => a[1].length - b[1].length);
+  return sorted.slice(0, 3).map(([, v]) => v).join(' / ');
+}
+
+/** Pick the most distinguishing labels across multiple series (labels that differ between series) */
+function distinguishingLabels(allSeries: Array<{ labels: Record<string, string> }>): string[] {
+  if (allSeries.length <= 1) return [];
+  const allKeys = new Set<string>();
+  for (const s of allSeries) for (const k of Object.keys(s.labels)) if (k !== '__name__') allKeys.add(k);
+
+  // A label is distinguishing if its values differ across series
+  const distinguishing: string[] = [];
+  for (const key of allKeys) {
+    const values = new Set(allSeries.map((s) => s.labels[key] ?? ''));
+    if (values.size > 1) distinguishing.push(key);
+  }
+  return distinguishing;
+}
+
+function smartLabel(s: { labels: Record<string, string> }, distLabels: string[]): string {
+  if (distLabels.length > 0) {
+    const parts = distLabels.slice(0, 3).map((k) => s.labels[k]).filter(Boolean);
+    if (parts.length > 0) return parts.join(' / ');
+  }
+  return seriesLabel(s.labels);
 }
 
 function resolveLabel(s: ExtendedSeriesData): string {
@@ -187,18 +213,48 @@ function RechartsArea({
   stackMode?: 'none' | 'normal' | 'percent';
   unit?: string;
 }) {
-  const displaySeries = series.slice(0, 10);
+  const maxChartSeries = 20;
+  const displaySeries = series.slice(0, maxChartSeries);
   const isStacked = stackMode === 'normal' || stackMode === 'percent';
   const [hiddenSeries, setHiddenSeries] = useState<Set<number>>(new Set());
+  const [activeDotInfo, setActiveDotInfo] = useState<{ ts: number; key: string; color: string } | null>(null);
 
-  const toggleSeries = useCallback((idx: number) => {
+  const handleLegendClick = useCallback((idx: number, e: React.MouseEvent) => {
     setHiddenSeries((prev) => {
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl/Cmd+click: toggle single series
+        const next = new Set(prev);
+        if (next.has(idx)) next.delete(idx);
+        else next.add(idx);
+        return next;
+      }
+
+      const visibleCount = displaySeries.length - prev.size;
+      const isCurrentlyVisible = !prev.has(idx);
+
+      if (visibleCount === displaySeries.length) {
+        // All visible → isolate clicked (hide all others)
+        const next = new Set<number>();
+        for (let i = 0; i < displaySeries.length; i++) {
+          if (i !== idx) next.add(i);
+        }
+        return next;
+      }
+
+      if (isCurrentlyVisible && visibleCount === 1) {
+        // Only this one visible → restore all
+        return new Set();
+      }
+
+      // Some hidden: toggle this one (show if hidden, hide if visible)
       const next = new Set(prev);
       if (next.has(idx)) next.delete(idx);
       else next.add(idx);
+      // If everything would be hidden, restore all
+      if (next.size === displaySeries.length) return new Set();
       return next;
     });
-  }, []);
+  }, [displaySeries]);
 
   const { chartData, seriesKeys } = useMemo(() => {
     const tsMap = new Map<number, Record<string, number>>();
@@ -243,12 +299,17 @@ function RechartsArea({
     });
   }, [displaySeries]);
 
-  const seriesLabels = useMemo(() => displaySeries.map((s) => resolveLabel(s)), [displaySeries]);
+  const distLabels = useMemo(() => distinguishingLabels(displaySeries), [displaySeries]);
+  const seriesLabels = useMemo(() => displaySeries.map((s) => {
+    if (s.legendFormat) return s.legendFormat.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key) => s.labels[key] ?? key);
+    return smartLabel(s, distLabels);
+  }), [displaySeries, distLabels]);
 
   return (
-    <div className="h-full rounded-lg p-2">
-      <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={chartData} margin={{ top: 8, right: 12, bottom: 20, left: 8 }}>
+    <div className="h-full rounded-lg p-2 flex flex-col overflow-hidden">
+      <div style={{ height: 'calc(100% - 36px)', minHeight: 80 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData} margin={{ top: 8, right: 12, bottom: 20, left: 4 }} onMouseLeave={() => setActiveDotInfo(null)}>
           {seriesKeys.map((key, i) => (
             <defs key={`grad-${key}`}>
               <linearGradient id={`grad-${key}`} x1="0" y1="0" x2="0" y2="1">
@@ -272,27 +333,60 @@ function RechartsArea({
             tick={{ fill: 'var(--color-on-surface-variant)', fontSize: 11 }}
             axisLine={{ stroke: 'var(--color-outline-variant)' }}
             tickLine={false}
-            width={50}
+            width={60}
           />
           <Tooltip
-            content={({ active, payload, label }) => {
+            cursor={{ stroke: 'var(--color-on-surface-variant)', strokeWidth: 1, strokeOpacity: 0.4 }}
+            isAnimationActive={false}
+            allowEscapeViewBox={{ x: true, y: true }}
+            offset={16}
+            content={({ active, payload, label, coordinate }) => {
               if (!active || !payload || payload.length === 0) return null;
+              const valid = payload.filter((e) => e.value != null && !Number.isNaN(e.value as number));
+              if (valid.length === 0) return null;
+
+              // Find the series closest to the mouse Y position
+              const mouseY = coordinate?.y ?? 0;
+              let closest = valid[0]!;
+              let minDist = Infinity;
+              for (const entry of valid) {
+                // Recharts stores the pixel Y in the payload via the chart coordinate system
+                // We approximate by comparing values — the entry whose value maps closest to mouseY
+                // Since we don't have pixel positions, just pick by value proximity to a rough scale
+                const chartHeight = 200;
+                const vals = valid.map((e) => e.value as number);
+                const maxVal = Math.max(...vals);
+                const minVal = Math.min(...vals);
+                const range = maxVal - minVal || 1;
+                const entryPixelY = chartHeight - ((entry.value as number) - minVal) / range * chartHeight;
+                const dist = Math.abs(entryPixelY - mouseY);
+                if (dist < minDist) {
+                  minDist = dist;
+                  closest = entry;
+                }
+              }
+
+              const idx = Number(closest.dataKey?.toString().replace('s', ''));
+              const ts = label as number;
+              const dotKey = String(closest.dataKey);
+              // Update active dot (only re-render if changed)
+              if (!activeDotInfo || activeDotInfo.ts !== ts || activeDotInfo.key !== dotKey) {
+                setTimeout(() => setActiveDotInfo({ ts, key: dotKey, color: String(closest.color) }), 0);
+              }
               return (
-                <div className="bg-[var(--color-surface-highest)] border border-[var(--color-outline-variant)] rounded-lg px-3 py-2 shadow-xl text-xs">
-                  <p className="text-[var(--color-on-surface-variant)] mb-1.5">{formatTime(label as number)}</p>
-                  {payload.map((entry, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: entry.color }} />
-                      <span className="text-[var(--color-on-surface)] truncate max-w-[140px]">
-                        {seriesLabels[Number(entry.dataKey?.toString().replace('s', ''))] ?? String(entry.dataKey)}
-                      </span>
-                      <span className="text-[var(--color-on-surface)] font-mono font-semibold ml-auto">
-                        {stackMode === 'percent'
-                          ? `${(entry.value as number).toFixed(1)}%`
-                          : formatValueWithUnit(entry.value as number, unit)}
-                      </span>
-                    </div>
-                  ))}
+                <div className="bg-[var(--color-surface-highest)] rounded-lg px-3 py-1.5 shadow-xl text-xs" style={{ border: '1px solid var(--color-outline-variant)' }}>
+                  <p className="text-[var(--color-on-surface-variant)] mb-1 font-mono text-[10px]">{formatTime(label as number)}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full inline-block shrink-0" style={{ backgroundColor: closest.color }} />
+                    <span className="text-[var(--color-on-surface)] truncate" style={{ maxWidth: 180 }}>
+                      {seriesLabels[idx] ?? String(closest.dataKey)}
+                    </span>
+                    <span className="text-[var(--color-on-surface)] font-mono font-semibold ml-auto pl-3">
+                      {stackMode === 'percent'
+                        ? `${(closest.value as number).toFixed(1)}%`
+                        : formatValueWithUnit(closest.value as number, unit)}
+                    </span>
+                  </div>
                 </div>
               );
             }}
@@ -306,20 +400,32 @@ function RechartsArea({
               strokeWidth={2}
               fill={`url(#grad-${key})`}
               dot={false}
+              activeDot={false}
               connectNulls
               hide={hiddenSeries.has(i)}
               {...(isStacked ? { stackId: 'stack' } : {})}
             />
           ))}
+          {activeDotInfo && (
+            <ReferenceDot
+              x={activeDotInfo.ts}
+              y={chartData.find((d) => d.ts === activeDotInfo.ts)?.[activeDotInfo.key] as number | undefined}
+              r={5}
+              fill={activeDotInfo.color}
+              stroke="var(--color-surface-highest)"
+              strokeWidth={2}
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
+      </div>
 
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 px-2 pb-1">
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5 px-2 pt-1 overflow-y-auto" style={{ height: 32, flexShrink: 0 }}>
         {seriesLabels.map((label, i) => (
           <button
             key={i}
             type="button"
-            onClick={() => toggleSeries(i)}
+            onClick={(e) => handleLegendClick(i, e)}
             className={`flex items-center gap-1.5 text-xs transition-opacity ${
               hiddenSeries.has(i) ? 'opacity-30' : 'text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]'
             }`}
@@ -328,7 +434,7 @@ function RechartsArea({
             <span className="truncate max-w-[200px]">{label}</span>
           </button>
         ))}
-        {totalSeries > 10 && <span className="text-xs text-[var(--color-outline)]">+{totalSeries - 10} more</span>}
+        {totalSeries > maxChartSeries && <span className="text-[10px] text-[var(--color-outline)]">+{totalSeries - maxChartSeries} not plotted</span>}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
-import { feedStore, } from './feed-store.js';
+import { feedStore, } from '@agentic-obs/data-layer';
 import { initSse, sendSseEvent, sendSseKeepAlive } from './investigation/sse.js';
 const VALID_FEED_TYPES = [
     'investigation_complete',

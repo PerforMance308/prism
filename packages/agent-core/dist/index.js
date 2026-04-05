@@ -11,4 +11,12 @@ export * from './case-library/index.js';
 export * from './postmortem/index.js';
 export * from './scheduled/index.js';
 export * from './alerting/index.js';
+export * from './runtime/index.js';
+export * from './verification/index.js';
+export * from './adapters/index.js';
+// Dashboard agents are exported under a namespace-style prefix to avoid name conflicts
+// with domain-level agents (e.g. InvestigationAgent exists in both).
+// Import specific items: import { OrchestratorAgent, AlertRuleAgent } from '@agentic-obs/agent-core/dashboard-agents'
+// Or use the barrel: import { DashboardOrchestratorAgent } from '@agentic-obs/agent-core'
+export { OrchestratorAgent as DashboardOrchestratorAgent, DashboardGeneratorAgent, PanelAdderAgent, PanelBuilderAgent, InvestigationAgent as DashboardInvestigationAgent, AlertRuleAgent, ResearchAgent, DiscoveryAgent, ActionExecutor, } from './dashboard-agents/index.js';
 //# sourceMappingURL=index.js.map

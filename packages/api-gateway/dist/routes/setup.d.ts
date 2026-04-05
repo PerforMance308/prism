@@ -1,6 +1,6 @@
 import { Router } from 'express';
 export interface LlmConfig {
-    provider: 'anthropic' | 'openai' | 'azure-openai' | 'aws-bedrock' | 'ollama' | 'gemini' | 'corporate-gateway';
+    provider: 'anthropic' | 'openai' | 'deepseek' | 'azure-openai' | 'aws-bedrock' | 'ollama' | 'gemini' | 'corporate-gateway';
     apiKey?: string;
     model: string;
     baseUrl?: string;

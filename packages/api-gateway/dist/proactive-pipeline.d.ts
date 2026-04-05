@@ -15,8 +15,7 @@
  */
 import type { AnomalyDetector, SloBurnMonitor, ChangeWatcher, CorrelationEngine, TopologyProvider, AlertRuleEvaluator } from '@agentic-obs/agent-core';
 import type { TopologyStore } from '@agentic-obs/data-layer';
-import type { FeedStore } from './routes/feed-store.js';
-import type { IncidentStore } from './routes/incident-store.js';
+import type { FeedStore, IncidentStore } from '@agentic-obs/data-layer';
 /**
  * Bridges the data-layer TopologyStore to the CorrelationEngine's
  * TopologyProvider interface, returning all direct upstream and downstream

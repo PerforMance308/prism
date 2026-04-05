@@ -1,77 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import { LLMUnavailableError, } from '@agentic-obs/common';
-const HYPOTHESIS_TEMPLATES = [
-    {
-        matches: (f) => f.some((x) => x.stepType === 'correlate_deployments' && x.isAnomaly) &&
-            f.some((x) => x.stepType === 'compare_latency_vs_baseline' && x.isAnomaly),
-        hint: (f) => {
-            const latency = f.find((x) => x.stepType === 'compare_latency_vs_baseline' && x.isAnomaly);
-            return `A recent deployment may have caused a latency regression (deviation: ${((latency?.deviationRatio ?? 0) * 100).toFixed(0)}%)`;
-        },
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'inspect_downstream' && x.isAnomaly),
-        hint: () => 'A downstream dependency may be degraded, causing elevated latency',
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'check_error_rate' && x.isAnomaly) &&
-            !f.some((x) => x.stepType === 'correlate_deployments' && x.isAnomaly),
-        hint: () => 'Error rate is elevated without a recent deployment - possible external dependency failure or transient issue.',
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'compare_latency_vs_baseline' && x.isAnomaly) &&
-            !f.some((x) => x.stepType === 'correlate_deployments' && x.isAnomaly) &&
-            !f.some((x) => x.stepType === 'inspect_downstream' && x.isAnomaly),
-        hint: () => 'Latency spike with no correlated deployment or downstream issue - possible resource saturation or unexpected traffic surge',
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'check_saturation' && x.isAnomaly),
-        hint: (f) => {
-            const hasLatency = f.some((x) => x.stepType === 'compare_latency_vs_baseline' && x.isAnomaly);
-            return hasLatency
-                ? 'Resource saturation (CPU/memory) is likely causing the observed latency increase'
-                : 'Resource saturation detected - may be approaching degradation thresholds';
-        },
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'check_traffic_pattern' && x.isAnomaly),
-        hint: (f) => {
-            const traffic = f.find((x) => x.stepType === 'check_traffic_pattern');
-            const ratio = traffic?.deviationRatio ?? 0;
-            return ratio > 0
-                ? `Traffic surge (${((1 + ratio) * 100).toFixed(0)}% of baseline) may be overwhelming service capacity`
-                : `Traffic drop (${Math.abs(ratio * 100).toFixed(0)}% off baseline) possible upstream failure or routing change`;
-        },
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'check_slo_burn_rate' && x.isAnomaly),
-        hint: () => 'SLO error budget is burning at an unsustainable rate - root cause needs urgent identification',
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'check_error_distribution' && x.isAnomaly) &&
-            f.some((x) => x.stepType === 'check_error_rate' && x.isAnomaly),
-        hint: (f) => {
-            const dist = f.find((x) => x.stepType === 'check_error_distribution');
-            const isDownstream = dist?.summary.includes('downstream');
-            return isDownstream
-                ? 'Errors appear to originate from a downstream dependency and propagate upstream'
-                : 'Errors appear to originate locally in the service itself, not from dependencies';
-        },
-    },
-    {
-        matches: (f) => f.some((x) => x.stepType === 'correlate_deployments' && x.isAnomaly) &&
-            f.some((x) => x.stepType === 'check_error_rate' && x.isAnomaly) &&
-            !f.some((x) => x.stepType === 'compare_latency_vs_baseline' && x.isAnomaly),
-        hint: () => 'A recent deployment introduced elevated errors without latency impact - possible logic bug or breaking API change',
-    },
-];
-/**
- * Returns prompt hint strings from all matching templates.
- * Used to guide the LLM without constraining its reasoning.
- */
-export function getMatchingHints(findings) {
-    return HYPOTHESIS_TEMPLATES.filter((t) => t.matches(findings)).map((t) => t.hint(findings));
-}
 function formatHistoricalCasesSection(cases) {
     if (!cases.length)
         return '';
@@ -94,24 +22,20 @@ function formatHistoricalCasesSection(cases) {
     return lines.join('\n');
 }
 /**
- * Calls the LLM with findings + hints, returns parsed Hypothesis[].
+ * Calls the LLM with findings, returns parsed Hypothesis[].
  * Throws on failure - caller should handle accordingly.
  */
-export async function synthesizeHypotheses(llm, investigationId, findings, hints, historicalCases = []) {
+export async function synthesizeHypotheses(llm, investigationId, findings, historicalCases = [], model) {
     const findingsText = findings
         .map((f) => `- [${f.stepType}] ${f.summary}${f.isAnomaly ? ' | anomaly' : ''}${f.value !== undefined ? ` | value=${f.value}` : ''}${f.deviationRatio !== undefined ? ` | deviation=${(f.deviationRatio * 100).toFixed(0)}%` : ''}`)
         .join('\n');
-    const hintsText = hints.length > 0
-        ? hints.map((h, i) => `- Hint ${i + 1}: ${h}`).join('\n')
-        : 'No rule-based directions matched - use your own analysis.';
     const casesSection = formatHistoricalCasesSection(historicalCases);
-    const userMessage = `You are an expert SRE analyzing observability data to identify root causes.
-
-OBSERVABILITY FINDINGS:
+    const systemMessage = `You are an expert SRE analyzing observability data to identify root causes of incidents.
+Given a set of investigation findings from monitoring systems, generate root-cause hypotheses.
+Consider correlations between findings, common failure patterns, and the relative severity of anomalies.
+Focus on actionable hypotheses that an on-call engineer could verify or rule out.`;
+    const userMessage = `OBSERVABILITY FINDINGS:
 ${findingsText}
-
-INVESTIGATION DIRECTIONS (these are hints only - use your own reasoning and feel free to generate additional hypotheses):
-${hintsText}
 
 ${casesSection ? `${casesSection}\n\n` : ''}Generate a JSON array of root cause hypotheses. For each hypothesis provide:
 - "description": clear, specific hypothesis about the root cause
@@ -121,9 +45,9 @@ ${casesSection ? `${casesSection}\n\n` : ''}Generate a JSON array of root cause 
 
 Return ONLY a valid JSON array. No markdown, no explanation outside the JSON.`;
     const response = await llm.complete([
-        { role: 'system', content: userMessage },
+        { role: 'system', content: systemMessage },
         { role: 'user', content: userMessage },
-    ], { model: 'claude-sonnet-4-5', temperature: 0.2, maxTokens: 1024, responseFormat: 'json' });
+    ], { model, temperature: 0.2, maxTokens: 1024, responseFormat: 'json' });
     const parsed = JSON.parse(response.content
         .trim()
         .replace(/^```(?:json)?\s*/i, '')
@@ -155,17 +79,16 @@ Return ONLY a valid JSON array. No markdown, no explanation outside the JSON.`;
  *
  * @param historicalCases - pre-fetched similar cases to inject as LLM context (optional)
  */
-export async function generateHypotheses(investigationId, findings, llm, historicalCases = []) {
-    if (!llm) {
+export async function generateHypotheses(investigationId, findings, llm, historicalCases = [], model) {
+    if (!llm || !model) {
         return [];
     }
     const anomalous = findings.filter((f) => f.isAnomaly);
     if (anomalous.length === 0) {
         return [];
     }
-    const hints = getMatchingHints(findings);
     try {
-        const hypotheses = await synthesizeHypotheses(llm, investigationId, findings, hints, historicalCases);
+        const hypotheses = await synthesizeHypotheses(llm, investigationId, findings, historicalCases, model);
         hypotheses.sort((a, b) => b.confidence - a.confidence);
         return hypotheses;
     }

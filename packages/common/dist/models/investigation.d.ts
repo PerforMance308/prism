@@ -39,6 +39,7 @@ export interface Investigation {
     actions: Action[];
     evidence: Evidence[];
     symptoms: Symptom[];
+    workspaceId?: string;
     createdAt: string;
     updatedAt: string;
 }

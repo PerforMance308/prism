@@ -1,4 +1,4 @@
-import { LLMUnavailableError } from '@agentic-obs/common';
+import { DEFAULT_LLM_MODEL, LLMUnavailableError } from '@agentic-obs/common';
 export class VerificationLoop {
     llm;
     observationWindowMs;
@@ -19,7 +19,7 @@ export class VerificationLoop {
                     content: this.buildVerificationPrompt(executionResult, preExecutionMetrics, postExecutionMetrics),
                 },
             ], {
-                model: 'claude-sonnet-4-6',
+                model: DEFAULT_LLM_MODEL,
                 temperature: 0.1,
                 maxTokens: 1024,
                 responseFormat: 'json',

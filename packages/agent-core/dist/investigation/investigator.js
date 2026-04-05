@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { createLogger } from '@agentic-obs/common';
+const log = createLogger('investigator');
 import { getStepsForTaskType, executeStep } from './steps.js';
 import { generateHypotheses } from './hypotheses.js';
 import { investigationOutputSchema } from './schema.js';
@@ -13,12 +15,14 @@ export class InvestigationAgent {
     adapter;
     config;
     llm;
+    model;
     caseRetriever;
     useCaseLibrary;
     constructor(deps = {}) {
         this.adapter = deps.adapter;
         this.config = { ...DEFAULT_CONFIG, ...(deps.config ?? {}) };
         this.llm = deps.llm;
+        this.model = deps.model;
         this.caseRetriever = deps.caseRetriever;
         this.useCaseLibrary = deps.useCaseLibrary ?? true;
     }
@@ -27,7 +31,7 @@ export class InvestigationAgent {
             const output = await this.investigate(input, agentCtx.investigationId);
             const validation = investigationOutputSchema.safeParse(output);
             if (!validation.success) {
-                console.warn('[InvestigationAgent] Output schema validation failed:', validation.error.format());
+                log.warn({ validationError: validation.error.format() }, 'output schema validation failed');
             }
             return { success: true, data: output };
         }
@@ -85,7 +89,7 @@ export class InvestigationAgent {
                 step.cost = { tokens: 0, queries: 0, latencyMs: Date.now() - stepStartMs };
                 findings.push(finding);
                 const partialHypotheses = this.llm !== undefined
-                    ? await generateHypotheses(investigationId, findings, this.llm)
+                    ? await generateHypotheses(investigationId, findings, this.llm, [], this.model)
                     : [];
                 if (partialHypotheses.length > 0 &&
                     partialHypotheses[0].confidence >= this.config.highConfidenceThreshold) {
@@ -109,7 +113,7 @@ export class InvestigationAgent {
                 topK: 3,
             })
             : [];
-        const hypotheses = await generateHypotheses(investigationId, findings, this.llm, historicalCases);
+        const hypotheses = await generateHypotheses(investigationId, findings, this.llm, historicalCases, this.model);
         return {
             plan: {
                 entity: intent.entity,

@@ -3,11 +3,10 @@ import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { investigationOpenApiSpec } from './openapi.js';
-import { defaultInvestigationStore } from './store.js';
+import { defaultInvestigationStore, feedStore as defaultFeed, defaultShareStore } from '@agentic-obs/data-layer';
 import { initSse, sendSseEvent, sendSseKeepAlive, closeSse } from './sse.js';
-import { feedStore as defaultFeed } from '../feed-store.js';
 import { LiveOrchestratorRunner } from './live-orchestrator-runner.js';
-import { defaultShareStore } from './share-store.js';
+import { getWorkspaceId } from '../../middleware/workspace-context.js';
 export function createInvestigationRouter(deps = {}) {
     const store = deps.store ?? defaultInvestigationStore;
     const feed = deps.feed ?? defaultFeed;
@@ -25,12 +24,14 @@ export function createInvestigationRouter(deps = {}) {
                 return;
             }
             const authReq = req;
+            const workspaceId = getWorkspaceId(req);
             const investigation = await store.create({
                 question: body.question.trim(),
                 sessionId: body.sessionId ?? `ses_${Date.now()}`,
                 userId: authReq.auth?.sub ?? 'anonymous',
                 entity: body.entity,
                 timeRange: body.timeRange,
+                workspaceId,
             });
             // Async orchestration - does not block the HTTP response
             orchestrator.run({
@@ -70,9 +71,10 @@ export function createInvestigationRouter(deps = {}) {
         }
     });
     // -- GET /investigations
-    router.get('/', requirePermission('investigation:read'), async (_req, res, next) => {
+    router.get('/', requirePermission('investigation:read'), async (req, res, next) => {
         try {
-            const all = (await store.findAll()).map((inv) => ({
+            const workspaceId = getWorkspaceId(req);
+            const all = (await store.findAll()).filter((inv) => (inv.workspaceId ?? 'default') === workspaceId).map((inv) => ({
                 id: inv.id,
                 status: inv.status,
                 intent: inv.intent,
@@ -92,6 +94,11 @@ export function createInvestigationRouter(deps = {}) {
         try {
             const inv = await store.findById(req.params['id'] ?? '');
             if (!inv) {
+                res.status(404).json({ code: 'NOT_FOUND', message: 'Investigation not found' });
+                return;
+            }
+            const workspaceId = getWorkspaceId(req);
+            if ((inv.workspaceId ?? 'default') !== workspaceId) {
                 res.status(404).json({ code: 'NOT_FOUND', message: 'Investigation not found' });
                 return;
             }

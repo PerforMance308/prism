@@ -5,6 +5,7 @@
 // 2. LLM generalises symptoms / rootCause / resolution from the investigation data.
 // 3. Dedup: if retriever.search() returns a hit with score > 0.8 -> skip (return null).
 // 4. On pass, add the record via caseStore and return it.
+import { DEFAULT_LLM_MODEL } from '@agentic-obs/common';
 export class CaseWriter {
     llm;
     caseStore;
@@ -16,7 +17,7 @@ export class CaseWriter {
         this.llm = config.llm;
         this.caseStore = config.caseStore;
         this.retriever = config.retriever;
-        this.model = config.model ?? 'claude-sonnet-4-6';
+        this.model = config.model ?? DEFAULT_LLM_MODEL;
         this.temperature = config.temperature ?? 0.1;
         this.dedupThreshold = config.dedupThreshold ?? 0.8;
     }

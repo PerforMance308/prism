@@ -30,6 +30,7 @@ import { createIntentRouter } from './routes/intent.js';
 import { createWorkspaceRouter } from './routes/workspaces.js';
 import { createVersionRouter } from './routes/versions.js';
 import { createFolderRouter } from './routes/folders.js';
+import { createSearchRouter } from './routes/search.js';
 import {
   createRepositories,
   createInMemoryRepositories,
@@ -120,6 +121,7 @@ export function createApp(): Application {
   app.use('/api/dashboards', createDashboardRouter({ store: stores.dashboards }));
   app.use('/api/alert-rules', alertRulesRouter);
   app.use('/api/folders', createFolderRouter());
+  app.use('/api/search', createSearchRouter());
   app.use('/api/workspaces', createWorkspaceRouter());
   app.use('/api/versions', createVersionRouter());
 

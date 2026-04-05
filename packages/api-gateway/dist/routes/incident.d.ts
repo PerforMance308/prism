@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { postMortemStore as postmortemStore } from './post-mortem-store.js';
+import { postMortemStore as postmortemStore } from '@agentic-obs/data-layer';
 import type { PostMortemInput, PostMortemReport } from '@agentic-obs/agent-core';
 import type { IGatewayIncidentStore } from '../repositories/types.js';
 export interface PostMortemGeneratorDep {
