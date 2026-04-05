@@ -2,4 +2,5 @@ export { AppConfigSchema } from './schema.js';
 export type { AppConfig } from './schema.js';
 export { ConfigLoader } from './loader.js';
 export type { ConfigLoaderOptions } from './loader.js';
+export { DEFAULT_LLM_MODEL } from './model-defaults.js';
 //# sourceMappingURL=index.d.ts.map

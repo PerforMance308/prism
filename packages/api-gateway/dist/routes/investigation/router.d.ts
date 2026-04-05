@@ -1,6 +1,6 @@
 import { Router } from 'express';
+import type { IGatewayInvestigationStore, IGatewayFeedStore, IGatewayShareStore } from '@agentic-obs/data-layer';
 import type { OrchestratorRunner } from './orchestrator-runner.js';
-import type { IGatewayInvestigationStore, IGatewayFeedStore, IGatewayShareStore } from '../../repositories/types.js';
 interface InvestigationRouterDeps {
     store?: IGatewayInvestigationStore;
     feed?: IGatewayFeedStore;

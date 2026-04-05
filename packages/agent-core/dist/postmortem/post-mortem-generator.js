@@ -4,7 +4,7 @@
 // raw incident data. This is NOT template filling - the LLM reasons over all
 // available signals to produce an original narrative for each section.
 import { randomUUID } from 'node:crypto';
-import { LLMUnavailableError } from '@agentic-obs/common';
+import { DEFAULT_LLM_MODEL, LLMUnavailableError } from '@agentic-obs/common';
 // - Generator --------------------------------------------------------------
 export class PostMortemGenerator {
     llm;
@@ -33,7 +33,7 @@ export class PostMortemGenerator {
                     content: this.buildPrompt(input),
                 },
             ], {
-                model: 'claude-sonnet-4-5',
+                model: DEFAULT_LLM_MODEL,
                 temperature: 0.2,
                 maxTokens: 3000,
                 responseFormat: 'json',

@@ -1,7 +1,6 @@
 import { INTENT_SYSTEM_PROMPT, buildPromptMessage } from './prompts.js';
 import { parseAndValidate, IntentValidationError } from './schema.js';
 const DEFAULT_OPTIONS = {
-    model: 'gpt-4o-mini',
     temperature: 0,
     maxTokens: 512,
 };
@@ -9,7 +8,7 @@ export class IntentAgent {
     name = 'intent';
     gateway;
     options;
-    constructor(gateway, options = {}) {
+    constructor(gateway, options) {
         this.gateway = gateway;
         this.options = { ...DEFAULT_OPTIONS, ...options };
     }

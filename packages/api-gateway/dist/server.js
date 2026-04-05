@@ -16,6 +16,7 @@ import { metaRouter } from './routes/meta.js';
 import { createApprovalRouter } from './routes/approval.js';
 import { metricsRouter } from './routes/metrics.js';
 import { createWebhookRouter } from './routes/webhooks.js';
+import { createInvestigationReportRouter } from './routes/investigation-reports.js';
 import { createSetupRouter } from './routes/setup.js';
 import { datasourcesRouter } from './routes/datasources.js';
 import { createAuthRouter } from './routes/auth.js';
@@ -25,10 +26,14 @@ import { createDashboardRouter } from './routes/dashboard/router.js';
 import { alertRulesRouter } from './routes/alert-rules.js';
 import { notificationsRouter } from './routes/notifications.js';
 import { createIntentRouter } from './routes/intent.js';
+import { createWorkspaceRouter } from './routes/workspaces.js';
+import { createVersionRouter } from './routes/versions.js';
+import { createFolderRouter } from './routes/folders.js';
+import { createSearchRouter } from './routes/search.js';
 import { createRepositories, createDbClient, } from '@agentic-obs/data-layer';
 import { createDefaultStores } from './repositories/factory.js';
 import { createLogger, requestLogger, GracefulShutdown, ShutdownPriority } from '@agentic-obs/common';
-import { registerStore, loadAll, flushStores } from './persistence.js';
+import { registerStore, loadAll, flushStores, markDirty } from './persistence.js';
 const log = createLogger('api-gateway');
 function buildRepositories() {
     const dbUrl = process.env['DATABASE_URL'];
@@ -73,6 +78,7 @@ export function createApp() {
     app.use('/api/metrics', metricsRouter);
     app.use('/api/notifications', notificationsRouter);
     app.use('/api/intent', createIntentRouter(stores.dashboards));
+    app.use('/api/investigation-reports', createInvestigationReportRouter());
     // /api/schedules is mounted by startServer() when a real ScheduleInvestigation instance is provided
     // Serve frontend static assets (production: built Vite output)
     const webDistCandidates = [
@@ -96,6 +102,10 @@ export function createApp() {
     app.use('/api/query', createQueryRouter());
     app.use('/api/dashboards', createDashboardRouter({ store: stores.dashboards }));
     app.use('/api/alert-rules', alertRulesRouter);
+    app.use('/api/folders', createFolderRouter());
+    app.use('/api/search', createSearchRouter());
+    app.use('/api/workspaces', createWorkspaceRouter());
+    app.use('/api/versions', createVersionRouter());
     // 404 for unmatched routes
     app.use(notFoundHandler);
     // Centralized error handler (must be last)
@@ -107,23 +117,10 @@ export function startServer(port = 3000) {
     const shutdown = new GracefulShutdown();
     // Register all stores for JSON file persistence and load saved data
     void (async () => {
-        const { defaultDashboardStore, defaultAlertRuleStore, defaultConversationStore, defaultInvestigationReportStore, defaultInvestigationStore, defaultShareStore, defaultNotificationStore, } = await Promise.all([
-            import('./routes/dashboard/store.js'),
-            import('./routes/alert-rule-store.js'),
-            import('./routes/dashboard/conversation-store.js'),
-            import('./routes/dashboard/investigation-report-store.js'),
-            import('./routes/investigation/store.js'),
-            import('./routes/investigation/share-store.js'),
-            import('./routes/notification-store.js'),
-        ]).then(([dashboards, alertRules, conversations, investigationReports, investigations, shares, notifications,]) => ({
-            defaultDashboardStore: dashboards.defaultDashboardStore,
-            defaultAlertRuleStore: alertRules.defaultAlertRuleStore,
-            defaultConversationStore: conversations.defaultConversationStore,
-            defaultInvestigationReportStore: investigationReports.defaultInvestigationReportStore,
-            defaultInvestigationStore: investigations.defaultInvestigationStore,
-            defaultShareStore: shares.defaultShareStore,
-            defaultNotificationStore: notifications.defaultNotificationStore,
-        }));
+        // Connect data-layer's markDirty to api-gateway's persistence layer
+        const { setMarkDirty } = await import('@agentic-obs/data-layer');
+        setMarkDirty(markDirty);
+        const { defaultDashboardStore, defaultAlertRuleStore, defaultConversationStore, defaultInvestigationReportStore, defaultInvestigationStore, defaultShareStore, defaultNotificationStore, defaultFolderStore, } = await import('@agentic-obs/data-layer');
         registerStore('dashboards', defaultDashboardStore);
         registerStore('alertRules', defaultAlertRuleStore);
         registerStore('conversations', defaultConversationStore);
@@ -131,9 +128,12 @@ export function startServer(port = 3000) {
         registerStore('investigations', defaultInvestigationStore);
         registerStore('shares', defaultShareStore);
         registerStore('notifications', defaultNotificationStore);
+        registerStore('folders', defaultFolderStore);
         await loadAll();
         log.info('Persisted store data loaded');
-    })();
+    })().catch((err) => {
+        log.error({ err: err instanceof Error ? err.message : err }, 'failed to load persisted stores');
+    });
     // Wrap Express app in httpServer + attach Socket.io WebSocket gateway
     void import('./websocket/gateway.js').then(({ createWebSocketGateway }) => {
         const { httpServer, gateway } = createWebSocketGateway(app);
@@ -142,6 +142,8 @@ export function startServer(port = 3000) {
         // (createApp() is used by tests without triggering background workers).
         void import('./proactive-pipeline-runner.js').then(async ({ runProactivePipeline }) => {
             await runProactivePipeline();
+        }).catch((err) => {
+            log.error({ err: err instanceof Error ? err.message : err }, 'proactive pipeline failed to start');
         });
         httpServer.listen(port, () => {
             log.info({ port }, 'API gateway listening');
@@ -182,6 +184,8 @@ export function startServer(port = 3000) {
         });
         // Attach OS signal handlers
         shutdown.listen();
+    }).catch((err) => {
+        log.error({ err: err instanceof Error ? err.message : err }, 'websocket gateway failed to initialize');
     });
 }
 //# sourceMappingURL=server.js.map

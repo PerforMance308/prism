@@ -21,6 +21,7 @@ export interface AlertRule {
     pendingSince?: string;
     notificationPolicyId?: string;
     investigationId?: string;
+    workspaceId?: string;
     createdBy: string;
     createdAt: string;
     updatedAt: string;
@@ -138,4 +139,9 @@ export interface AlertGroup {
     }>;
 }
 export type SilenceStatus = 'active' | 'expired' | 'pending';
+export interface AlertRuleProvider {
+    getActiveRules(): AlertRule[];
+    transition(id: string, newState: AlertRuleState, value?: number): AlertRule | undefined;
+    markEvaluated(id: string): void;
+}
 //# sourceMappingURL=alert.d.ts.map

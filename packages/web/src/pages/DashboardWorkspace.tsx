@@ -171,7 +171,7 @@ function TimeRangePicker({ value, onChange, onRefresh }: {
 function FolderDialog({ dashboardId, currentFolder, onSaved, open, onClose }: {
   dashboardId: string; currentFolder?: string; onSaved: (folder: string) => void; open: boolean; onClose: () => void;
 }) {
-  const [folders, setFolders] = React.useState<string[]>([]);
+  const [folders, setFolders] = React.useState<Array<{ id: string; name: string; parentId?: string }>>([]);
   const [selected, setSelected] = React.useState(currentFolder || '');
   const [creatingNew, setCreatingNew] = React.useState(false);
   const [newFolder, setNewFolder] = React.useState('');
@@ -182,11 +182,8 @@ function FolderDialog({ dashboardId, currentFolder, onSaved, open, onClose }: {
     setSelected(currentFolder || '');
     setCreatingNew(false);
     setNewFolder('');
-    void apiClient.get<Dashboard[]>('/dashboards').then((res) => {
-      if (!res.error) {
-        const set = new Set((Array.isArray(res.data) ? res.data : []).map((d: Dashboard) => d.folder).filter(Boolean) as string[]);
-        setFolders([...set].sort());
-      }
+    void apiClient.get<Array<{ id: string; name: string; parentId?: string }>>('/folders').then((res) => {
+      if (!res.error) setFolders(res.data);
     });
   }, [open, currentFolder]);
 
@@ -225,11 +222,12 @@ function FolderDialog({ dashboardId, currentFolder, onSaved, open, onClose }: {
           </button>
 
           {folders.map((f) => (
-            <button key={f} type="button" onClick={() => setSelected(f)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors ${selected === f ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-bright'}`}>
+            <button key={f.id} type="button" onClick={() => setSelected(f.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-left transition-colors ${selected === f.id ? 'bg-primary/10 text-primary' : 'text-on-surface hover:bg-surface-bright'}`}
+              style={{ paddingLeft: f.parentId ? 36 : undefined }}>
               <svg className="w-5 h-5 shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-              <span className="flex-1 truncate">{f}</span>
-              {selected === f && <svg className="w-4 h-4 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 111.414-1.414l2.543 2.543 6.543-6.543a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+              <span className="flex-1 truncate">{f.name}</span>
+              {selected === f.id && <svg className="w-4 h-4 ml-auto" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-3.25-3.25a1 1 0 111.414-1.414l2.543 2.543 6.543-6.543a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
             </button>
           ))}
 
@@ -239,7 +237,15 @@ function FolderDialog({ dashboardId, currentFolder, onSaved, open, onClose }: {
               <svg className="w-5 h-5 shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
               <input ref={inputRef} type="text" value={newFolder} onChange={(e) => setNewFolder(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && newFolder.trim()) { setSelected(newFolder.trim()); setCreatingNew(false); }
+                  if (e.key === 'Enter' && newFolder.trim()) {
+                    void apiClient.post<{ id: string; name: string }>('/folders', { name: newFolder.trim() }).then((res) => {
+                      if (!res.error) {
+                        setFolders((prev) => [...prev, res.data]);
+                        setSelected(res.data.id);
+                      }
+                    });
+                    setCreatingNew(false);
+                  }
                   if (e.key === 'Escape') setCreatingNew(false);
                 }}
                 placeholder="Folder name"
@@ -271,7 +277,125 @@ function FolderDialog({ dashboardId, currentFolder, onSaved, open, onClose }: {
   );
 }
 
-// Main
+// Export format converters
+
+function toGrafana(dash: Dashboard): unknown {
+  return {
+    __inputs: [{ name: 'DS_PROMETHEUS', label: 'Prometheus', type: 'datasource', pluginId: 'prometheus' }],
+    title: dash.title,
+    description: dash.description ?? '',
+    tags: ['prism-export'],
+    timezone: 'browser',
+    editable: true,
+    panels: (dash.panels ?? []).map((p, i) => ({
+      id: i + 1,
+      title: p.title,
+      description: p.description ?? '',
+      type: p.visualization === 'time_series' ? 'timeseries'
+        : p.visualization === 'stat' ? 'stat'
+        : p.visualization === 'gauge' ? 'gauge'
+        : p.visualization === 'bar' ? 'barchart'
+        : p.visualization === 'pie' ? 'piechart'
+        : p.visualization === 'table' ? 'table'
+        : p.visualization === 'heatmap' ? 'heatmap'
+        : p.visualization === 'histogram' ? 'histogram'
+        : 'timeseries',
+      gridPos: { h: p.height ?? 8, w: p.width ?? 12, x: p.col ?? 0, y: p.row ?? 0 },
+      targets: (p.queries ?? []).map((q, qi) => ({
+        refId: q.refId || String.fromCharCode(65 + qi),
+        expr: q.expr,
+        legendFormat: q.legendFormat ?? '',
+        datasource: { type: 'prometheus', uid: '${DS_PROMETHEUS}' },
+        instant: q.instant ?? false,
+      })),
+      fieldConfig: { defaults: { unit: p.unit ?? 'short' } },
+      datasource: { type: 'prometheus', uid: '${DS_PROMETHEUS}' },
+    })),
+    templating: { list: (dash.variables ?? []).map((v) => ({
+      name: v.name, label: v.label ?? v.name, type: 'query', query: v.query ?? '',
+      multi: false, includeAll: false,
+    })) },
+    time: { from: 'now-1h', to: 'now' },
+    refresh: '30s',
+    schemaVersion: 39,
+    version: 1,
+  };
+}
+
+function toPrometheusRules(dash: Dashboard): string {
+  const rules = (dash.panels ?? [])
+    .flatMap((p) => (p.queries ?? []).map((q) => ({
+      record: `prism:${p.title.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase()}`,
+      expr: q.expr,
+    })));
+  return `groups:\n  - name: ${dash.title.replace(/[^a-zA-Z0-9_ -]/g, '')}\n    rules:\n${rules.map((r) => `      - record: ${r.record}\n        expr: ${r.expr}`).join('\n')}`;
+}
+
+function downloadFile(content: string, filename: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function ExportMenu({ dashboard }: { dashboard: Dashboard }) {
+  const [open, setOpen] = React.useState(false);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const [pos, setPos] = React.useState({ top: 0, right: 0 });
+
+  React.useEffect(() => {
+    if (!open) return;
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const slug = dashboard.title.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const formats = [
+    { label: 'Prism JSON', desc: 'Native format', onClick: () => { downloadFile(JSON.stringify(dashboard, null, 2), `${slug}.json`, 'application/json'); setOpen(false); } },
+    { label: 'Grafana JSON', desc: 'Import into Grafana', onClick: () => { downloadFile(JSON.stringify(toGrafana(dashboard), null, 2), `${slug}_grafana.json`, 'application/json'); setOpen(false); } },
+    { label: 'Prometheus Rules', desc: 'Recording rules YAML', onClick: () => { downloadFile(toPrometheusRules(dashboard), `${slug}_rules.yml`, 'text/yaml'); setOpen(false); } },
+  ];
+
+  return (
+    <>
+      <button ref={btnRef} type="button" onClick={() => setOpen(!open)}
+        className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-high transition-colors" title="Export">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </button>
+      {open && ReactDOM.createPortal(
+        <div ref={menuRef} className="fixed w-56 bg-surface-highest rounded-xl shadow-2xl shadow-black/40 py-1" style={{ top: pos.top, right: pos.right, zIndex: 9999 }}>
+          <p className="px-3 py-1.5 text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Export as</p>
+          {formats.map((f) => (
+            <button key={f.label} type="button" onClick={f.onClick}
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-bright transition-colors">
+              <div className="flex-1">
+                <div className="text-sm text-on-surface">{f.label}</div>
+                <div className="text-[10px] text-on-surface-variant">{f.desc}</div>
+              </div>
+              <svg className="w-4 h-4 text-on-surface-variant shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
 
 // Main
 
@@ -607,35 +731,34 @@ export default function DashboardWorkspace() {
             <button
               type="button"
               onClick={() => setEditMode((v) => !v)}
-              className={`p-1.5 rounded-lg transition-colors ${editMode ? 'bg-primary/15 text-primary' : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-high'}`}
-              title={editMode ? 'Exit edit mode' : 'Edit dashboard'}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                editMode
+                  ? 'bg-primary text-on-primary-fixed'
+                  : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-high'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
+              {editMode ? 'Editing' : 'Edit'}
             </button>
 
+            {/* Add panel (only in edit mode) */}
+            {editMode && (
+              <button
+                type="button"
+                onClick={() => void handleAddPanel()}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-high transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+                Add Panel
+              </button>
+            )}
+
             {/* Export */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!id || !dashboard) return;
-                const json = JSON.stringify(dashboard, null, 2);
-                const blob = new Blob([json], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${dashboard.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-high transition-colors"
-              title="Export JSON"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </button>
+            <ExportMenu dashboard={dashboard} />
 
             {id && (
               <button

@@ -1,4 +1,6 @@
 // ExplanationAgent - generates structured SRE conclusions from hypotheses + evidence
+import { createLogger } from '@agentic-obs/common';
+const log = createLogger('explanation-agent');
 import { ExplanationParseError } from './types.js';
 import { getSystemPrompt, buildExplanationUserMessage } from './prompts.js';
 import { structuredConclusionSchema } from './schema.js';
@@ -9,7 +11,6 @@ function stripCodeFences(raw) {
     return match?.[1]?.trim() ?? trimmed;
 }
 const DEFAULT_OPTIONS = {
-    model: 'claude-sonnet-4-6',
     temperature: 0.1,
     maxTokens: 2048,
 };
@@ -18,7 +19,7 @@ export class ExplanationAgent {
     name = 'explanation';
     gateway;
     options;
-    constructor(gateway, options = {}) {
+    constructor(gateway, options) {
         this.gateway = gateway;
         this.options = { ...DEFAULT_OPTIONS, ...options };
     }
@@ -141,7 +142,7 @@ export class ExplanationAgent {
         };
         const validation = structuredConclusionSchema.safeParse(conclusion);
         if (!validation.success) {
-            console.warn('[ExplanationAgent] StructuredConclusion schema validation failed:', validation.error.format());
+            log.warn({ validationError: validation.error.format() }, 'StructuredConclusion schema validation failed');
         }
         return conclusion;
     }

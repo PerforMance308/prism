@@ -2,15 +2,16 @@ import { Router } from 'express';
 import { randomUUID } from 'crypto';
 import { authMiddleware } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/rbac.js';
-import { LiveDashboardGenerator } from './generator.js';
-import { defaultConversationStore } from './conversation-store.js';
+import { defaultConversationStore, defaultInvestigationReportStore } from '@agentic-obs/data-layer';
 import { handleChatMessage } from './chat-handler.js';
 import { VariableResolver } from './variable-resolver.js';
-import { defaultInvestigationReportStore } from './investigation-report-store.js';
 import { getSetupConfig } from '../setup.js';
+import { getWorkspaceId } from '../../middleware/workspace-context.js';
+import { DashboardService, withDashboardLock } from '../../services/dashboard-service.js';
+import { createLogger } from '@agentic-obs/common';
+const log = createLogger('dashboard-router');
 export function createDashboardRouter(deps = {}) {
     const store = deps.store;
-    const generator = deps.generator ?? new LiveDashboardGenerator(store);
     const conversationStore = deps.conversationStore ?? defaultConversationStore;
     const router = Router();
     // All dashboard routes require authentication
@@ -24,6 +25,7 @@ export function createDashboardRouter(deps = {}) {
                 return;
             }
             const userId = req.auth?.sub ?? 'anonymous';
+            const workspaceId = getWorkspaceId(req);
             const dashboard = await store.create({
                 title: body.title?.trim() ?? 'Untitled Dashboard',
                 description: '',
@@ -32,12 +34,22 @@ export function createDashboardRouter(deps = {}) {
                 datasourceIds: body.datasourceIds ?? [],
                 useExistingMetrics: body.useExistingMetrics ?? true,
                 folder: body.folder,
+                workspaceId,
             });
-            // When stream=true, skip background generation - client will use POST /:id/chat for SSE
-            if (!body.stream) {
-                generator.generate(dashboard.id, dashboard.prompt, userId);
-            }
             res.status(201).json(dashboard);
+            // Trigger generation in background via the orchestrator agent (same path as chat)
+            if (!body.stream) {
+                const service = new DashboardService(store, conversationStore);
+                void withDashboardLock(dashboard.id, async () => {
+                    try {
+                        await service.handleChatMessage(dashboard.id, dashboard.prompt, () => { });
+                    }
+                    catch (err) {
+                        log.error({ err, dashboardId: dashboard.id }, 'background generation failed');
+                        await store.update(dashboard.id, { status: 'failed' });
+                    }
+                });
+            }
         }
         catch (err) {
             next(err);
@@ -47,7 +59,10 @@ export function createDashboardRouter(deps = {}) {
     router.get('/', requirePermission('dashboard:read'), async (req, res, next) => {
         try {
             const typeFilter = req.query['type'];
+            const workspaceId = getWorkspaceId(req);
             let all = await store.findAll();
+            // Filter by workspace
+            all = all.filter((d) => (d.workspaceId ?? 'default') === workspaceId);
             if (typeFilter) {
                 all = all.filter((d) => d.type === typeFilter);
             }
@@ -94,12 +109,35 @@ export function createDashboardRouter(deps = {}) {
         // Return the most recent one
         res.json(reports[reports.length - 1]);
     });
+    // GET /dashboards/:id/export — download as JSON file
+    router.get('/:id/export', requirePermission('dashboard:read'), async (req, res, next) => {
+        try {
+            const id = req.params['id'] ?? '';
+            const dashboard = await store.findById(id);
+            if (!dashboard) {
+                res.status(404).json({ code: 'NOT_FOUND', message: 'Dashboard not found' });
+                return;
+            }
+            const filename = `${dashboard.title.replace(/[^a-zA-Z0-9_-]/g, '_')}.json`;
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.json(dashboard);
+        }
+        catch (err) {
+            next(err);
+        }
+    });
     // GET /dashboards/:id
     router.get('/:id', requirePermission('dashboard:read'), async (req, res, next) => {
         try {
             const id = req.params['id'] ?? '';
             const dashboard = await store.findById(id);
             if (!dashboard) {
+                res.status(404).json({ code: 'NOT_FOUND', message: 'Dashboard not found' });
+                return;
+            }
+            const workspaceId = getWorkspaceId(req);
+            if ((dashboard.workspaceId ?? 'default') !== workspaceId) {
                 res.status(404).json({ code: 'NOT_FOUND', message: 'Dashboard not found' });
                 return;
             }

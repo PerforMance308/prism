@@ -2,6 +2,8 @@
 // Like Grafana's default SQLite - zero-config, data survives restarts
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createLogger } from '@agentic-obs/common';
+const log = createLogger('persistence');
 const DATA_DIR = process.env['DATA_DIR'] || join(process.cwd(), '.uname-data');
 const STORE_FILE = join(DATA_DIR, 'stores.json');
 const registry = new Map();
@@ -20,18 +22,18 @@ export async function loadAll() {
                     store.loadJSON(data[name]);
                 }
                 catch (err) {
-                    console.error(`[persistence] Failed to load store "${name}":`, err);
+                    log.error({ err, store: name }, 'failed to load store');
                 }
             }
         }
-        console.log(`[persistence] Loaded ${registry.size} stores from ${STORE_FILE}`);
+        log.info({ storeCount: registry.size, file: STORE_FILE }, 'loaded stores');
     }
     catch (err) {
         if (err.code === 'ENOENT') {
-            console.log('[persistence] No saved data found - starting fresh');
+            log.info('no saved data found - starting fresh');
         }
         else {
-            console.error('[persistence] Failed to read store file:', err);
+            log.error({ err }, 'failed to read store file');
         }
     }
 }
@@ -50,7 +52,7 @@ async function flush() {
         await (await import('node:fs/promises')).rename(tmpFile, STORE_FILE);
     }
     catch (err) {
-        console.error('[persistence] Failed to write store file:', err);
+        log.error({ err }, 'failed to write store file');
     }
 }
 export function markDirty() {
@@ -60,7 +62,9 @@ export function markDirty() {
     // Debounce: write at most every 2 seconds
     flushTimer = setTimeout(() => {
         flushTimer = null;
-        void flush();
+        void flush().catch((err) => {
+            log.error({ err }, 'async flush failed');
+        });
     }, 2000);
 }
 export async function flushStores() {
@@ -70,6 +74,6 @@ export async function flushStores() {
     }
     dirty = true; // Force final flush
     await flush();
-    console.log('[persistence] Final flush complete');
+    log.info('final flush complete');
 }
 //# sourceMappingURL=persistence.js.map

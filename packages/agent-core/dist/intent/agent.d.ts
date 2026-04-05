@@ -2,7 +2,7 @@ import type { StructuredIntent } from '@agentic-obs/common';
 import type { LLMGateway } from '@agentic-obs/llm-gateway';
 import type { IntentInput } from './types.js';
 export interface IntentAgentOptions {
-    model?: string;
+    model: string;
     temperature?: number;
     maxTokens?: number;
 }
@@ -10,7 +10,7 @@ export declare class IntentAgent {
     readonly name = "intent";
     private readonly gateway;
     private readonly options;
-    constructor(gateway: LLMGateway, options?: IntentAgentOptions);
+    constructor(gateway: LLMGateway, options: IntentAgentOptions);
     /**
      * Parse a natural-language message into a StructuredIntent.
      * Throws on LLM failure or invalid response schema.

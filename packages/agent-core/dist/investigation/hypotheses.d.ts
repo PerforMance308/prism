@@ -3,15 +3,10 @@ import type { LLMGateway } from '@agentic-obs/llm-gateway';
 import type { ScoredCase } from '../case-library/types.js';
 import type { StepFinding } from './types.js';
 /**
- * Returns prompt hint strings from all matching templates.
- * Used to guide the LLM without constraining its reasoning.
- */
-export declare function getMatchingHints(findings: StepFinding[]): string[];
-/**
- * Calls the LLM with findings + hints, returns parsed Hypothesis[].
+ * Calls the LLM with findings, returns parsed Hypothesis[].
  * Throws on failure - caller should handle accordingly.
  */
-export declare function synthesizeHypotheses(llm: LLMGateway, investigationId: string, findings: StepFinding[], hints: string[], historicalCases?: ScoredCase[]): Promise<Hypothesis[]>;
+export declare function synthesizeHypotheses(llm: LLMGateway, investigationId: string, findings: StepFinding[], historicalCases: ScoredCase[] | undefined, model: string): Promise<Hypothesis[]>;
 /**
  * Generates hypotheses from investigation findings.
  *
@@ -24,5 +19,5 @@ export declare function synthesizeHypotheses(llm: LLMGateway, investigationId: s
  *
  * @param historicalCases - pre-fetched similar cases to inject as LLM context (optional)
  */
-export declare function generateHypotheses(investigationId: string, findings: StepFinding[], llm?: LLMGateway, historicalCases?: ScoredCase[]): Promise<Hypothesis[]>;
+export declare function generateHypotheses(investigationId: string, findings: StepFinding[], llm?: LLMGateway, historicalCases?: ScoredCase[], model?: string): Promise<Hypothesis[]>;
 //# sourceMappingURL=hypotheses.d.ts.map

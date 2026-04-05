@@ -1,5 +1,7 @@
 // Orchestrator runner - decouples the HTTP router from agent pipeline details.
 // Inject OrchestratorRunner into createInvestigationRouter for testability.
+import { createLogger } from '@agentic-obs/common';
+const log = createLogger('orchestrator-runner');
 // Stub implementation (no live agents)
 // Transitions the investigation through all states and writes a fixed item.
 // Replace with a real AgentOrchestrator-backed runner in production.
@@ -11,7 +13,9 @@ export class StubOrchestratorRunner {
         this.feed = feed;
     }
     run(input) {
-        void this.execute(input);
+        void this.execute(input).catch((err) => {
+            log.error({ err }, 'async execution failed');
+        });
     }
     async execute(input) {
         const { investigationId, question } = input;

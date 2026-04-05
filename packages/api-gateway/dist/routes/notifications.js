@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { defaultNotificationStore } from './notification-store.js';
-import { defaultAlertRuleStore } from './alert-rule-store.js';
+import { defaultNotificationStore, defaultAlertRuleStore } from '@agentic-obs/data-layer';
 const router = Router();
 // -- Contact Points
 // GET /api/notifications/contact-points

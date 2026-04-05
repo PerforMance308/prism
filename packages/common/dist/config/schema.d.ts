@@ -86,6 +86,12 @@ export declare const AppConfigSchema: z.ZodObject<{
         format?: "text" | "json" | undefined;
     }>;
 }, "strip", z.ZodTypeAny, {
+    llm: {
+        provider: "anthropic" | "openai" | "azure" | "gemini" | "ollama";
+        apiKey: string;
+        model: string;
+        fallbackProvider?: "anthropic" | "openai" | "azure" | "gemini" | "ollama" | undefined;
+    };
     server: {
         host: string;
         port: number;
@@ -99,12 +105,6 @@ export declare const AppConfigSchema: z.ZodObject<{
     redis: {
         url: string;
         prefix: string;
-    };
-    llm: {
-        provider: "anthropic" | "openai" | "azure" | "gemini" | "ollama";
-        apiKey: string;
-        model: string;
-        fallbackProvider?: "anthropic" | "openai" | "azure" | "gemini" | "ollama" | undefined;
     };
     proactive: {
         checkIntervalMs: number;
@@ -120,6 +120,12 @@ export declare const AppConfigSchema: z.ZodObject<{
         format: "text" | "json";
     };
 }, {
+    llm: {
+        apiKey: string;
+        provider?: "anthropic" | "openai" | "azure" | "gemini" | "ollama" | undefined;
+        model?: string | undefined;
+        fallbackProvider?: "anthropic" | "openai" | "azure" | "gemini" | "ollama" | undefined;
+    };
     server: {
         host?: string | undefined;
         port?: number | undefined;
@@ -133,12 +139,6 @@ export declare const AppConfigSchema: z.ZodObject<{
     redis: {
         url?: string | undefined;
         prefix?: string | undefined;
-    };
-    llm: {
-        apiKey: string;
-        provider?: "anthropic" | "openai" | "azure" | "gemini" | "ollama" | undefined;
-        model?: string | undefined;
-        fallbackProvider?: "anthropic" | "openai" | "azure" | "gemini" | "ollama" | undefined;
     };
     proactive: {
         checkIntervalMs?: number | undefined;

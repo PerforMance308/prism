@@ -2,7 +2,7 @@ import type { LLMGateway } from '@agentic-obs/llm-gateway';
 import type { Agent, AgentContext, AgentResult } from '../index.js';
 import type { ExplanationInput, StructuredConclusion } from './types.js';
 export interface ExplanationAgentOptions {
-    model?: string;
+    model: string;
     temperature?: number;
     maxTokens?: number;
 }
@@ -10,7 +10,7 @@ export declare class ExplanationAgent implements Agent<ExplanationInput, Structu
     readonly name = "explanation";
     private readonly gateway;
     private readonly options;
-    constructor(gateway: LLMGateway, options?: ExplanationAgentOptions);
+    constructor(gateway: LLMGateway, options: ExplanationAgentOptions);
     /**
      * Generate a StructuredConclusion from hypotheses and their evidence chains.
      * Does not modify any evidence content - only rephrases and ranks.

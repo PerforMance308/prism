@@ -3,6 +3,8 @@ import { promises as fs } from 'fs';
 import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { join } from 'path';
+import { createLogger, DEFAULT_LLM_MODEL } from '@agentic-obs/common';
+const log = createLogger('setup');
 import { AnthropicProvider, OpenAIProvider, GeminiProvider, OllamaProvider, } from '@agentic-obs/llm-gateway';
 // -- Persistence
 const CONFIG_DIR = join(homedir(), '.agentic-obs');
@@ -63,7 +65,7 @@ async function testLlmConnection(cfg) {
                     'anthropic-version': '2023-06-01',
                 },
                 body: JSON.stringify({
-                    model: cfg.model || 'claude-sonnet-4-6',
+                    model: cfg.model || DEFAULT_LLM_MODEL,
                     messages: [{ role: 'user', content: 'Say "ok".' }],
                     max_tokens: 5,
                 }),
@@ -87,11 +89,14 @@ async function testLlmConnection(cfg) {
             const body = await res.json().catch(() => ({}));
             return { ok: false, message: body.error?.message ?? `HTTP ${res.status}` };
         }
-        if (cfg.provider === 'openai') {
-            const key = cfg.apiKey ?? process.env['OPENAI_API_KEY'] ?? '';
+        if (cfg.provider === 'openai' || cfg.provider === 'deepseek') {
+            const key = cfg.apiKey ?? '';
             if (!key)
                 return { ok: false, message: 'API key is required' };
-            const res = await fetch('https://api.openai.com/v1/models', {
+            const base = cfg.provider === 'deepseek'
+                ? (cfg.baseUrl || 'https://api.deepseek.com')
+                : (cfg.baseUrl || 'https://api.openai.com/v1');
+            const res = await fetch(`${base}/models`, {
                 headers: { Authorization: `Bearer ${key}` },
             });
             if (res.ok)
@@ -169,8 +174,12 @@ async function fetchModels(cfg) {
                 const provider = new AnthropicProvider({ apiKey: cfg.apiKey ?? '', baseUrl: cfg.baseUrl });
                 return await provider.listModels();
             }
-            case 'openai': {
-                const provider = new OpenAIProvider({ apiKey: cfg.apiKey ?? '', baseUrl: cfg.baseUrl });
+            case 'openai':
+            case 'deepseek': {
+                const base = cfg.provider === 'deepseek'
+                    ? (cfg.baseUrl || 'https://api.deepseek.com')
+                    : cfg.baseUrl;
+                const provider = new OpenAIProvider({ apiKey: cfg.apiKey ?? '', baseUrl: base });
                 return await provider.listModels();
             }
             case 'gemini': {
@@ -213,7 +222,27 @@ export function ensureConfigLoaded() {
 export function createSetupRouter() {
     const router = Router();
     // Load persisted config on startup
-    void ensureConfigLoaded();
+    void ensureConfigLoaded().catch((err) => {
+        log.error({ err }, 'failed to load config');
+    });
+    // GET /api/setup/config — returns current config (API keys masked)
+    router.get('/config', (_req, res) => {
+        const cfg = { ...inMemoryConfig };
+        // Mask sensitive fields
+        if (cfg.llm) {
+            cfg.llm = {
+                ...cfg.llm,
+                apiKey: cfg.llm.apiKey ? '••••••' + cfg.llm.apiKey.slice(-4) : undefined,
+                tokenHelperCommand: cfg.llm.tokenHelperCommand,
+            };
+        }
+        cfg.datasources = cfg.datasources.map((ds) => ({
+            ...ds,
+            apiKey: ds.apiKey ? '••••••' + ds.apiKey.slice(-4) : undefined,
+            password: ds.password ? '••••••' : undefined,
+        }));
+        res.json(cfg);
+    });
     // GET /api/setup/status
     router.get('/status', (_req, res) => {
         res.json({

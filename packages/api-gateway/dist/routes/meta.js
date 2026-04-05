@@ -4,8 +4,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
-import { defaultInvestigationStore } from './investigation/store.js';
-import { feedStore } from './feed-store.js';
+import { defaultInvestigationStore, feedStore } from '@agentic-obs/data-layer';
 export const metaRouter = Router();
 // All meta routes require authentication and meta:read permission
 metaRouter.use(authMiddleware);

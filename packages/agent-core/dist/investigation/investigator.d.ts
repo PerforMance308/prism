@@ -6,8 +6,10 @@ import type { InvestigationConfig, InvestigationInput, InvestigationOutput } fro
 export interface InvestigationAgentDeps {
     adapter?: DataAdapter;
     config?: InvestigationConfig;
-    /** Optional LLM gateway for hypothesis synthesis. When omitted, falls back to rule-based. */
+    /** Optional LLM gateway for hypothesis synthesis. When omitted, returns empty hypotheses. */
     llm?: LLMGateway;
+    /** LLM model identifier. Required when llm is provided. */
+    model?: string;
     /** Optional case retriever. When provided, similar past cases are injected into the LLM prompt. */
     caseRetriever?: CaseRetriever;
     /** Toggle case library injection. Defaults to true. Set to false to skip case retrieval entirely. */
@@ -18,6 +20,7 @@ export declare class InvestigationAgent implements Agent<InvestigationInput, Inv
     private readonly adapter?;
     private readonly config;
     private readonly llm?;
+    private readonly model?;
     private readonly caseRetriever?;
     private readonly useCaseLibrary;
     constructor(deps?: InvestigationAgentDeps);

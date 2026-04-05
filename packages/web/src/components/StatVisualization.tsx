@@ -4,78 +4,61 @@ interface Props {
   value: number;
   unit?: string;
   title?: string;
+  description?: string;
 }
 
 function formatStatValue(value: number, unit?: string): string {
   if (Number.isNaN(value)) return 'NaN';
 
-  // Handle percentile: multiply by 100 and show with %
   if (unit === 'percentunit') {
-    // percentunit means a 0..1 ratio. If the value is already >1, avoid
-    // multiplying again and render a safer fallback so obviously wrong panels
-    // do not show absurd values like 9498%.
-    if (Math.abs(value) > 1.5) {
-      return `${value.toFixed(1)}%`;
-    }
+    if (Math.abs(value) > 1.5) return `${value.toFixed(1)}%`;
     const pct = value * 100;
     if (pct === 100) return '100%';
     if (pct > 10) return `${pct.toFixed(1)}%`;
     return `${pct.toFixed(2)}%`;
   }
 
-  // Handle bytes: format as KiB/MiB/GiB (binary units, 1024-based)
+  if (unit === 'percent') return `${value.toFixed(1)}%`;
+
   if (unit === 'bytes') {
     const abs = Math.abs(value);
-    if (abs >= 1024 ** 4) return `${(value / 1024 ** 4).toFixed(2)} TB`;
-    if (abs >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(2)} GB`;
-    if (abs >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(2)} MB`;
-    if (abs >= 1024) return `${(value / 1024).toFixed(2)} KB`;
+    if (abs >= 1024 ** 4) return `${(value / 1024 ** 4).toFixed(1)} TB`;
+    if (abs >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(1)} GB`;
+    if (abs >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+    if (abs >= 1024) return `${(value / 1024).toFixed(1)} KB`;
     return `${value.toFixed(0)} B`;
   }
 
-  if (Math.abs(value) >= 1e9) return `${(value / 1e9).toFixed(2)}G`;
-  if (Math.abs(value) >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(2)}K`;
-  if (Math.abs(value) < 0.01 && value !== 0) return value.toExponential(2);
+  if (unit === 'seconds') {
+    const abs = Math.abs(value);
+    if (abs >= 3600) return `${(value / 3600).toFixed(1)} h`;
+    if (abs >= 60) return `${(value / 60).toFixed(1)} min`;
+    if (abs >= 1) return `${value.toFixed(2)} s`;
+    if (abs >= 0.001) return `${(value * 1000).toFixed(1)} ms`;
+    return `${(value * 1e6).toFixed(0)} µs`;
+  }
+
+  if (unit === 'reqps' || unit === 'ops') {
+    if (Math.abs(value) >= 1e6) return `${(value / 1e6).toFixed(1)}M req/s`;
+    if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(1)}K req/s`;
+    return `${value.toFixed(1)} req/s`;
+  }
+
+  // Generic number formatting
+  if (Math.abs(value) >= 1e9) return `${(value / 1e9).toFixed(1)}G`;
+  if (Math.abs(value) >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
+  if (Math.abs(value) >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
   if (Number.isInteger(value)) return String(value);
-  return value.toFixed(3);
+  if (Math.abs(value) < 0.01 && value !== 0) return value.toExponential(2);
+  return value.toFixed(2);
 }
 
-function getUnitSuffix(unit?: string): string {
-  if (!unit) return '';
-  if (unit === 'percentunit' || unit === 'bytes') return ''; // already handled in format
-  return unit;
-}
-
-function getBackgroundGradient(value: number, unit?: string): string {
-  // Only apply color gradient for percentage/ratio-like values
-  const isRatio = unit === 'percentunit' || unit === 'percent';
-  if (!isRatio) return 'bg-[var(--color-surface-highest)]';
-
-  const pct = unit === 'percentunit'
-    ? (Math.abs(value) > 1.5 ? value : value * 100)
-    : value;
-  if (pct < 20) return 'bg-gradient-to-t from-emerald-900/30 to-[var(--color-surface-highest)]';
-  if (pct < 80) return 'bg-gradient-to-t from-amber-900/30 to-[var(--color-surface-highest)]';
-  return 'bg-gradient-to-t from-red-900/30 to-[var(--color-surface-highest)]';
-}
-
-export default function StatVisualization({ value, unit, title }: Props) {
-  const bgClass = getBackgroundGradient(value, unit);
-  const displayValue = formatStatValue(value, unit);
-  const suffix = getUnitSuffix(unit);
-
+export default function StatVisualization({ value, unit }: Props) {
   return (
-    <div className={`flex flex-col items-center justify-center h-full py-6 gap-2 rounded-lg ${bgClass}`}>
-      {title && (
-        <p className="text-xs text-[var(--color-on-surface-variant)] uppercase tracking-wide font-medium">{title}</p>
-      )}
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-5xl font-bold text-[var(--color-on-surface)] font-mono tabular-nums leading-none">
-          {displayValue}
-        </span>
-        {suffix && <span className="text-xl text-[var(--color-on-surface-variant)] font-medium">{suffix}</span>}
-      </div>
+    <div className="flex items-center justify-center h-full px-3">
+      <span className="text-3xl font-bold text-on-surface font-[Manrope] tabular-nums leading-none tracking-tight">
+        {formatStatValue(value, unit)}
+      </span>
     </div>
   );
 }

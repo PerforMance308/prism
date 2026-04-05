@@ -14,7 +14,11 @@ describe('ConfigLoader', () => {
             expect(config.security.jwtSecret).toBe('super-secret-key-that-is-at-least-32-chars!!');
         });
         it('applies default values for optional fields', () => {
-            const config = ConfigLoader.load({ overrideEnv: { ...REQUIRED_BASE } });
+            const config = ConfigLoader.load({
+                overrideEnv: { ...REQUIRED_BASE },
+                yamlFile: 'config/nonexistent.yml',
+                envYamlFile: false,
+            });
             expect(config.server.port).toBe(3000);
             expect(config.server.host).toBe('0.0.0.0');
             expect(config.server.corsOrigins).toEqual(['http://localhost:3000']);
@@ -101,6 +105,8 @@ describe('ConfigLoader', () => {
                     LLM_API_KEY: 'sk-test',
                     JWT_SECRET: 'super-secret-key-that-is-at-least-32-chars!!',
                 },
+                yamlFile: 'config/nonexistent.yml',
+                envYamlFile: false,
             })).toThrow();
         });
         it('throws when LLM_API_KEY is missing', () => {
@@ -109,6 +115,8 @@ describe('ConfigLoader', () => {
                     DATABASE_URL: 'postgres://localhost:5432/test',
                     JWT_SECRET: 'super-secret-key-that-is-at-least-32-chars!!',
                 },
+                yamlFile: 'config/nonexistent.yml',
+                envYamlFile: false,
             })).toThrow();
         });
         it('throws when JWT_SECRET is too short', () => {

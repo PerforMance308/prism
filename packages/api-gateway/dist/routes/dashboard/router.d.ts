@@ -1,12 +1,8 @@
 import { Router } from 'express';
 import type { Router as ExpressRouter } from 'express';
-import type { IGatewayDashboardStore, IConversationStore } from '../../repositories/types.js';
-export interface DashboardGenerator {
-    generate(dashboardId: string, prompt: string, userId: string): void;
-}
+import type { IGatewayDashboardStore, IConversationStore } from '@agentic-obs/data-layer';
 export interface DashboardRouterDeps {
     store?: IGatewayDashboardStore;
-    generator?: DashboardGenerator;
     conversationStore?: IConversationStore;
 }
 export declare function createDashboardRouter(deps?: DashboardRouterDeps): ExpressRouter;

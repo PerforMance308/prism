@@ -1,4 +1,4 @@
-import type { StructuredIntent, Hypothesis, Evidence, InvestigationStatus } from '@agentic-obs/common';
+import type { StructuredIntent, Hypothesis, Evidence, InvestigationStatus, ExplanationResult } from '@agentic-obs/common';
 import type { SystemContext } from '../context/types.js';
 import type { InvestigationOutput } from '../investigation/types.js';
 import type { EvidenceOutput } from '../evidence/types.js';
@@ -56,12 +56,7 @@ export interface OrchestratorOutput {
     completedAt: string;
     durationMs: number;
 }
-export interface ExplanationResult {
-    summary: string;
-    rootCause: string | null;
-    confidence: number;
-    recommendedActions: string[];
-}
+export type { ExplanationResult };
 export interface CoverageReport {
     covered: string[];
     uncovered: string[];

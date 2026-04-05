@@ -128,10 +128,10 @@ function SectionGrid({
       layouts={{ lg: layout }}
       width={width}
       cols={{ lg: 12, md: 12, sm: 6, xs: 2, xxs: 1 }}
-      rowHeight={80}
+      rowHeight={100}
       margin={[16, 16]}
       containerPadding={[0, 0]}
-      dragConfig={{ enabled: !!editMode, bounded: false, handle: '.drag-handle', threshold: 3 }}
+      dragConfig={{ enabled: !!editMode, bounded: false, handle: '.panel-drag-handle', threshold: 3 }}
       resizeConfig={{ enabled: !!editMode, handles: ['se'] }}
       onLayoutChange={(next) => onLayoutChange?.(next as Array<{ i: string; x: number; y: number; w: number; h: number }>)}
     >

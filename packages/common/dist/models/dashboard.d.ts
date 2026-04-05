@@ -1,3 +1,4 @@
+import type { PublishStatus } from './version.js';
 export type PanelVisualization = 'time_series' | 'stat' | 'table' | 'gauge' | 'bar' | 'heatmap' | 'pie' | 'histogram' | 'status_timeline';
 export type DashboardStatus = 'generating' | 'ready' | 'failed';
 export interface PanelQuery {
@@ -123,6 +124,21 @@ export type DashboardSseEvent = {
     type: 'investigation_report';
     report: InvestigationReport;
 } | {
+    type: 'verification_report';
+    report: {
+        status: string;
+        targetKind: string;
+        summary: string;
+        issues: Array<{
+            code: string;
+            severity: string;
+            message: string;
+            artifactKind: string;
+            artifactId?: string;
+        }>;
+        checksRun: string[];
+    };
+} | {
     type: 'reply';
     content: string;
 } | {
@@ -147,6 +163,9 @@ export interface Dashboard {
     datasourceIds: string[];
     useExistingMetrics: boolean;
     folder?: string;
+    workspaceId?: string;
+    version?: number;
+    publishStatus?: PublishStatus;
     createdAt: string;
     updatedAt: string;
     error?: string;

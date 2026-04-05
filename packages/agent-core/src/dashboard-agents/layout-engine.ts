@@ -15,7 +15,7 @@ function panelSize(viz: PanelVisualization, sameVizCount: number): PanelSize {
   switch (viz) {
     case 'stat':
     case 'gauge':
-      return { width: 3, height: 2 }
+      return { width: 3, height: 1 }
     case 'time_series':
       // 1 panel → full width; 2+ → half width side by side
       return { width: sameVizCount >= 2 ? 6 : 12, height: 3 }
