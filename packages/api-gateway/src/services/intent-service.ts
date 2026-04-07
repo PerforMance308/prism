@@ -1,7 +1,7 @@
 import { createLogger, DEFAULT_LLM_MODEL, type AlertRule } from '@agentic-obs/common';
 
 const log = createLogger('intent-service');
-import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore } from '@agentic-obs/data-layer';
+import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
 import { defaultAlertRuleStore } from '@agentic-obs/data-layer';
 import { AlertRuleAgent } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
@@ -43,6 +43,7 @@ export interface IntentServiceDeps {
   alertRuleStore?: IAlertRuleRepository;
   investigationStore?: IGatewayInvestigationStore;
   feedStore?: IGatewayFeedStore;
+  reportStore?: IInvestigationReportRepository;
 }
 
 export class IntentService {
@@ -50,12 +51,14 @@ export class IntentService {
   private readonly alertRuleStore: IAlertRuleRepository;
   private readonly investigationStore?: IGatewayInvestigationStore;
   private readonly feedStoreInstance?: IGatewayFeedStore;
+  private readonly reportStore?: IInvestigationReportRepository;
 
   constructor(deps: IntentServiceDeps) {
     this.dashboardStore = deps.dashboardStore;
     this.alertRuleStore = deps.alertRuleStore ?? defaultAlertRuleStore;
     this.investigationStore = deps.investigationStore;
     this.feedStoreInstance = deps.feedStore;
+    this.reportStore = deps.reportStore;
   }
 
   async classifyIntent(message: string): Promise<IntentType> {
@@ -149,23 +152,18 @@ export class IntentService {
   }
 
   async executeInvestigateIntent(message: string): Promise<IntentInvestigateResult> {
-    let investigationStore = this.investigationStore;
-    let feedStoreInstance = this.feedStoreInstance;
-    if (!investigationStore || !feedStoreInstance) {
-      const dl = await import('@agentic-obs/data-layer');
-      investigationStore = investigationStore ?? dl.defaultInvestigationStore;
-      feedStoreInstance = feedStoreInstance ?? dl.feedStore;
+    if (!this.investigationStore || !this.feedStoreInstance) {
+      throw new Error('investigationStore and feedStore are required for investigate intent');
     }
     const { LiveOrchestratorRunner } = await import('../routes/investigation/live-orchestrator-runner.js');
 
-    const investigation = await investigationStore.create({
+    const investigation = await this.investigationStore.create({
       question: message,
       sessionId: `ses_${Date.now()}`,
       userId: 'anonymous',
     });
 
-    const dl2 = await import('@agentic-obs/data-layer');
-    const orchestrator = new LiveOrchestratorRunner(investigationStore, feedStoreInstance, dl2.defaultInvestigationReportStore);
+    const orchestrator = new LiveOrchestratorRunner(this.investigationStore, this.feedStoreInstance, this.reportStore);
     orchestrator.run({
       investigationId: investigation.id,
       question: investigation.intent,

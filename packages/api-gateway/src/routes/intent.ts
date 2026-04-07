@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { getSetupConfig } from './setup.js';
 import type { IGatewayDashboardStore } from '../repositories/types.js';
-import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore } from '@agentic-obs/data-layer';
+import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
 import { IntentService } from '../services/intent-service.js';
 
 // SSE-streaming intent endpoint.
@@ -19,6 +19,7 @@ export interface IntentRouterDeps {
   alertRuleStore?: IAlertRuleRepository;
   investigationStore?: IGatewayInvestigationStore;
   feedStore?: IGatewayFeedStore;
+  reportStore?: IInvestigationReportRepository;
 }
 
 export function createIntentRouter(deps: IntentRouterDeps): Router {
@@ -28,6 +29,7 @@ export function createIntentRouter(deps: IntentRouterDeps): Router {
     alertRuleStore: deps.alertRuleStore,
     investigationStore: deps.investigationStore,
     feedStore: deps.feedStore,
+    reportStore: deps.reportStore,
   });
 
   router.post('/', async (req: Request, res: Response, _next: NextFunction) => {

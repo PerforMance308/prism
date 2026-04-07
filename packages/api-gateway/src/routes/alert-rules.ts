@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { AlertRule, AlertSilence, NotificationPolicy } from '@agentic-obs/common';
-import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore } from '@agentic-obs/data-layer';
+import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
 import { defaultAlertRuleStore } from '@agentic-obs/data-layer';
 import { AlertRuleService } from '../services/alert-rule-service.js';
 import { getWorkspaceId } from '../middleware/workspace-context.js';
@@ -10,6 +10,7 @@ export interface AlertRulesRouterDeps {
   alertRuleStore?: IAlertRuleRepository;
   investigationStore?: IGatewayInvestigationStore;
   feedStore?: IGatewayFeedStore;
+  reportStore?: IInvestigationReportRepository;
 }
 
 export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router {
@@ -171,25 +172,20 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
         return;
       }
 
-      // Use injected stores if available, otherwise fall back to singletons
-      let investigationStore = deps.investigationStore;
-      let feedStoreInstance = deps.feedStore;
-      if (!investigationStore || !feedStoreInstance) {
-        const dl = await import('@agentic-obs/data-layer');
-        investigationStore = investigationStore ?? dl.defaultInvestigationStore;
-        feedStoreInstance = feedStoreInstance ?? dl.feedStore;
+      if (!deps.investigationStore || !deps.feedStore) {
+        res.status(503).json({ code: 'NOT_CONFIGURED', message: 'Investigation stores not configured' });
+        return;
       }
       const { LiveOrchestratorRunner } = await import('../routes/investigation/live-orchestrator-runner.js');
 
       const question = `Investigate alert "${rule.name}": ${rule.condition.query} ${rule.condition.operator} ${rule.condition.threshold}`;
-      const investigation = await investigationStore.create({
+      const investigation = await deps.investigationStore.create({
         question,
         sessionId: `ses_alert_${Date.now()}`,
         userId: 'alert-system',
       });
 
-      const dl2 = await import('@agentic-obs/data-layer');
-      const orchestrator = new LiveOrchestratorRunner(investigationStore, feedStoreInstance, dl2.defaultInvestigationReportStore);
+      const orchestrator = new LiveOrchestratorRunner(deps.investigationStore, deps.feedStore, deps.reportStore);
       orchestrator.run({
         investigationId: investigation.id,
         question: investigation.intent,

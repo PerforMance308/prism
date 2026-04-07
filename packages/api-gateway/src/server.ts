@@ -163,6 +163,7 @@ export function createApp(): Application {
       alertRuleStore: eventAlertRuleStore,
       investigationStore: repos.investigations as any,
       feedStore: eventFeedStore,
+      reportStore: repos.investigationReports,
     }));
     app.use('/api/investigation-reports', createInvestigationReportRouter(repos.investigationReports));
     app.use('/api/dashboards', createDashboardRouter({
@@ -171,7 +172,12 @@ export function createApp(): Application {
       investigationReportStore: repos.investigationReports,
       alertRuleStore: eventAlertRuleStore,
     }));
-    app.use('/api/alert-rules', createAlertRulesRouter({ alertRuleStore: eventAlertRuleStore }));
+    app.use('/api/alert-rules', createAlertRulesRouter({
+      alertRuleStore: eventAlertRuleStore,
+      investigationStore: repos.investigations as any,
+      feedStore: eventFeedStore,
+      reportStore: repos.investigationReports,
+    }));
     app.use('/api/folders', createFolderRouter(repos.folders));
     app.use('/api/search', createSearchRouter({
       dashboardStore: repos.dashboards,
@@ -216,6 +222,7 @@ export function createApp(): Application {
       alertRuleStore: defaultAlertRuleStore,
       investigationStore: defaultInvestigationStore,
       feedStore,
+      reportStore: defaultInvestigationReportStore,
     }));
     app.use('/api/investigation-reports', createInvestigationReportRouter(defaultInvestigationReportStore));
     app.use('/api/dashboards', createDashboardRouter({
@@ -224,7 +231,12 @@ export function createApp(): Application {
       investigationReportStore: defaultInvestigationReportStore,
       alertRuleStore: defaultAlertRuleStore,
     }));
-    app.use('/api/alert-rules', createAlertRulesRouter({ alertRuleStore: defaultAlertRuleStore }));
+    app.use('/api/alert-rules', createAlertRulesRouter({
+      alertRuleStore: defaultAlertRuleStore,
+      investigationStore: defaultInvestigationStore,
+      feedStore,
+      reportStore: defaultInvestigationReportStore,
+    }));
     app.use('/api/folders', createFolderRouter(defaultFolderStore));
     app.use('/api/search', createSearchRouter({
       dashboardStore: defaultDashboardStore,
