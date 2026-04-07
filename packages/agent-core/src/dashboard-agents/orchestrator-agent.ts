@@ -136,7 +136,17 @@ export class OrchestratorAgent {
     }
 
     const history = await this.deps.conversationStore.getMessages(dashboardId)
-    const systemPrompt = this.buildSystemPrompt(dashboard, history)
+
+    // Fetch existing alert rules so LLM can reference them for modify/delete
+    let alertRules: Array<{ id: string; name: string; severity: string; condition: Record<string, unknown> }> = []
+    if (this.deps.alertRuleStore.findAll) {
+      try {
+        const result = await this.deps.alertRuleStore.findAll()
+        alertRules = (Array.isArray(result) ? result : (result as { list: unknown[] }).list ?? []) as typeof alertRules
+      } catch { /* ignore */ }
+    }
+
+    const systemPrompt = this.buildSystemPrompt(dashboard, history, alertRules)
 
     try {
       const result = await this.reactLoop.runLoop(
@@ -796,7 +806,7 @@ export class OrchestratorAgent {
     // but if we did get here, emit completed
   }
 
-  private buildSystemPrompt(dashboard: Dashboard, history: DashboardMessage[]): string {
+  private buildSystemPrompt(dashboard: Dashboard, history: DashboardMessage[], alertRules: Array<{ id: string; name: string; severity: string; condition: Record<string, unknown> }> = []): string {
     const panelsSummary = dashboard.panels.length > 0
       ? dashboard.panels.map((p) => `- [${p.id}] ${p.title} (${p.visualization})`).join('\n')
       : '(no panels yet)'
@@ -807,6 +817,10 @@ export class OrchestratorAgent {
 
     const historySection = history.length > 0
       ? `\n## Recent Conversation History\n${history.slice(-10).map((m) => `- ${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n')}\n`
+      : ''
+
+    const alertRulesSection = alertRules.length > 0
+      ? `\n## Existing Alert Rules\n${alertRules.map((r) => `- [${r.id}] "${r.name}" (${r.severity}) — ${(r.condition as Record<string, unknown>).query ?? ''} ${(r.condition as Record<string, unknown>).operator ?? ''} ${(r.condition as Record<string, unknown>).threshold ?? ''}`).join('\n')}\nUse these IDs with modify_alert_rule or delete_alert_rule.\n`
       : ''
 
     const datasources = this.deps.allDatasources ?? []
@@ -827,8 +841,7 @@ ${panelsSummary}
 
 ## Variables
 ${variablesSummary}
-${historySection}${datasourceSection}
-
+${historySection}${datasourceSection}${alertRulesSection}
 ## Available Tools
 
 ## Sub-agents (for complex work - these handle research, discovery, and panel generation internally)
