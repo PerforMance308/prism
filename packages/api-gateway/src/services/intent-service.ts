@@ -77,10 +77,10 @@ export class IntentService {
           `You are an intent classifier for an observability platform. Classify the user's message into exactly one intent.\n\n`
           + `Return JSON: { "intent": "<intent>" }\n\n`
           + `Possible intents:\n`
-          + `- "alert": The user wants to set up an alert, be notified, or monitor a condition with a threshold.\n`
-          + `- "dashboard": The user wants to create or view a monitoring dashboard to visualize metrics.\n`
-          + `- "investigate": The user is asking about a problem, wants to diagnose an issue, or is troubleshooting.\n\n`
-          + `Classify based on the user's actual goal, not surface-level keywords.`,
+          + `- "alert": The user wants to set up an alert rule, be notified when a threshold is breached, or create a monitoring condition.\n`
+          + `- "dashboard": The user wants to see, view, display, or visualize metrics. This includes requests like "show me X metrics", "give me a dashboard for Y", "I want to see Z", or any request to display/chart/graph data. When in doubt between dashboard and investigate, prefer dashboard.\n`
+          + `- "investigate": The user is explicitly asking about a specific problem, incident, or anomaly they've already observed — e.g. "why is latency high", "diagnose the error spike", "what caused the outage". The user must be describing a known issue to investigate.\n\n`
+          + `Key rule: If the user asks to "show", "give", "display", or "list" metrics without mentioning a specific problem, classify as "dashboard".`,
       },
       { role: 'user', content: message },
     ], {
