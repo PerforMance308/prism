@@ -279,7 +279,7 @@ export function ensureSchema(db: SqliteClient): void {
     )`,
     `CREATE TABLE IF NOT EXISTS investigation_reports (
       id TEXT PRIMARY KEY,
-      dashboard_id TEXT NOT NULL REFERENCES dashboards(id) ON DELETE CASCADE,
+      dashboard_id TEXT NOT NULL,
       goal TEXT NOT NULL,
       summary TEXT NOT NULL,
       sections TEXT NOT NULL,
