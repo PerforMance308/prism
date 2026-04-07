@@ -669,7 +669,7 @@ export class OrchestratorAgent {
             }
           }
 
-          const rule = this.deps.alertRuleStore.create({
+          const rule = await this.deps.alertRuleStore.create({
             name: generated.name,
             description: generated.description,
             originalPrompt: prompt,
@@ -700,7 +700,7 @@ export class OrchestratorAgent {
       }
     }
     catch (err) {
-      const observationText = `Action "${action}" failed: ${err instanceof Error ? err.message : String(err)}`
+      const observationText = `Action "${action}" failed: ${err instanceof Error ? err.message : String(err)}. Do NOT retry this action — inform the user of the error and use the "reply" action to end.`
       this.deps.sendEvent({
         type: 'tool_result',
         tool: action,
