@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { getSetupConfig } from './setup.js';
 import type { IGatewayDashboardStore } from '../repositories/types.js';
+import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore } from '@agentic-obs/data-layer';
 import { IntentService } from '../services/intent-service.js';
 
 // SSE-streaming intent endpoint.
@@ -13,9 +14,21 @@ import { IntentService } from '../services/intent-service.js';
 //
 // The home page stays visible throughout, showing real-time progress.
 
-export function createIntentRouter(dashboardStore: IGatewayDashboardStore): Router {
+export interface IntentRouterDeps {
+  dashboardStore: IGatewayDashboardStore;
+  alertRuleStore?: IAlertRuleRepository;
+  investigationStore?: IGatewayInvestigationStore;
+  feedStore?: IGatewayFeedStore;
+}
+
+export function createIntentRouter(deps: IntentRouterDeps): Router {
   const router = Router();
-  const intentService = new IntentService(dashboardStore);
+  const intentService = new IntentService({
+    dashboardStore: deps.dashboardStore,
+    alertRuleStore: deps.alertRuleStore,
+    investigationStore: deps.investigationStore,
+    feedStore: deps.feedStore,
+  });
 
   router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
     const body = req.body as { message?: string };

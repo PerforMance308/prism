@@ -1,15 +1,12 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { ApiError } from '@agentic-obs/common';
-import { InMemoryApprovalRepository } from '@agentic-obs/data-layer';
 import type { IApprovalRepository } from '@agentic-obs/data-layer';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 
-const defaultRepo: IApprovalRepository = new InMemoryApprovalRepository();
-
-export function createApprovalRouter(repo: IApprovalRepository = defaultRepo): Router {
+export function createApprovalRouter(repo: IApprovalRepository): Router {
   const router = Router();
 
   // GET /api/approvals - list pending approvals
@@ -152,4 +149,3 @@ export function createApprovalRouter(repo: IApprovalRepository = defaultRepo): R
   return router;
 }
 
-export const approvalRouter = createApprovalRouter();

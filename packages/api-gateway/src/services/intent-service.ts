@@ -1,6 +1,7 @@
 import { createLogger, DEFAULT_LLM_MODEL, type AlertRule } from '@agentic-obs/common';
 
 const log = createLogger('intent-service');
+import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore } from '@agentic-obs/data-layer';
 import { defaultAlertRuleStore } from '@agentic-obs/data-layer';
 import { AlertRuleAgent } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
@@ -37,13 +38,26 @@ export interface IntentProgress {
   data: unknown;
 }
 
-export class IntentService {
-  constructor(private dashboardStore: IGatewayDashboardStore) {}
+export interface IntentServiceDeps {
+  dashboardStore: IGatewayDashboardStore;
+  alertRuleStore?: IAlertRuleRepository;
+  investigationStore?: IGatewayInvestigationStore;
+  feedStore?: IGatewayFeedStore;
+}
 
-  /**
-   * Classify the user's message into an intent using the LLM.
-   * Returns one of: 'alert', 'dashboard', 'investigate'.
-   */
+export class IntentService {
+  private readonly dashboardStore: IGatewayDashboardStore;
+  private readonly alertRuleStore: IAlertRuleRepository;
+  private readonly investigationStore?: IGatewayInvestigationStore;
+  private readonly feedStoreInstance?: IGatewayFeedStore;
+
+  constructor(deps: IntentServiceDeps) {
+    this.dashboardStore = deps.dashboardStore;
+    this.alertRuleStore = deps.alertRuleStore ?? defaultAlertRuleStore;
+    this.investigationStore = deps.investigationStore;
+    this.feedStoreInstance = deps.feedStore;
+  }
+
   async classifyIntent(message: string): Promise<IntentType> {
     const config = getSetupConfig();
     if (!config.llm) {
@@ -82,9 +96,6 @@ export class IntentService {
     }
   }
 
-  /**
-   * Execute an alert intent: generate an alert rule from the message via LLM.
-   */
   async executeAlertIntent(message: string): Promise<IntentAlertResult> {
     const config = getSetupConfig();
     if (!config.llm) {
@@ -101,7 +112,7 @@ export class IntentService {
     const result = await agent.generate(message);
     const generated = result.rule;
 
-    const rule = defaultAlertRuleStore.create({
+    const rule = await this.alertRuleStore.create({
       name: generated.name,
       description: generated.description,
       originalPrompt: message,
@@ -120,9 +131,6 @@ export class IntentService {
     };
   }
 
-  /**
-   * Execute a dashboard intent: create a dashboard workspace.
-   */
   async executeDashboardIntent(message: string): Promise<IntentDashboardResult> {
     const dashboard = await this.dashboardStore.create({
       title: 'Untitled Dashboard',
@@ -140,20 +148,23 @@ export class IntentService {
     };
   }
 
-  /**
-   * Execute an investigate intent: create a real Investigation.
-   */
   async executeInvestigateIntent(message: string): Promise<IntentInvestigateResult> {
-    const { defaultInvestigationStore, feedStore } = await import('@agentic-obs/data-layer');
+    let investigationStore = this.investigationStore;
+    let feedStoreInstance = this.feedStoreInstance;
+    if (!investigationStore || !feedStoreInstance) {
+      const dl = await import('@agentic-obs/data-layer');
+      investigationStore = investigationStore ?? dl.defaultInvestigationStore;
+      feedStoreInstance = feedStoreInstance ?? dl.feedStore;
+    }
     const { LiveOrchestratorRunner } = await import('../routes/investigation/live-orchestrator-runner.js');
 
-    const investigation = await defaultInvestigationStore.create({
+    const investigation = await investigationStore.create({
       question: message,
       sessionId: `ses_${Date.now()}`,
       userId: 'anonymous',
     });
 
-    const orchestrator = new LiveOrchestratorRunner(defaultInvestigationStore, feedStore);
+    const orchestrator = new LiveOrchestratorRunner(investigationStore, feedStoreInstance);
     orchestrator.run({
       investigationId: investigation.id,
       question: investigation.intent,
@@ -168,10 +179,6 @@ export class IntentService {
     };
   }
 
-  /**
-   * Full intent flow: classify then execute.
-   * Calls onProgress for streaming updates.
-   */
   async processMessage(
     message: string,
     onProgress: (event: IntentProgress) => void,

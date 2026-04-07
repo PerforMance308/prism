@@ -4,14 +4,12 @@ import type { ApiError, IncidentSeverity, IncidentStatus } from '@agentic-obs/co
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 import {
-  incidentStore,
-  defaultInvestigationStore,
-  postMortemStore as postmortemStore,
   type CreateIncidentParams,
   type UpdateIncidentParams,
 } from '@agentic-obs/data-layer';
 import type { PostMortemInput, PostMortemReport } from '@agentic-obs/agent-core';
-import type { IGatewayIncidentStore } from '../repositories/types.js';
+import type { IGatewayIncidentStore, IGatewayInvestigationStore } from '../repositories/types.js';
+import type { IPostMortemRepository } from '@agentic-obs/data-layer';
 import { getWorkspaceId } from '../middleware/workspace-context.js';
 
 const VALID_STATUSES: IncidentStatus[] = ['open', 'mitigated', 'resolved'];
@@ -22,20 +20,21 @@ export interface PostMortemGeneratorDep {
   generate(input: PostMortemInput): Promise<PostMortemReport>;
 }
 
-export interface IncidentRouterExtras {
-  pmStore?: typeof postmortemStore;
+export interface IncidentRouterDeps {
+  store: IGatewayIncidentStore;
+  investigationStore: IGatewayInvestigationStore;
+  pmStore: IPostMortemRepository;
   generator?: PostMortemGeneratorDep;
 }
 
-export function createIncidentRouter(
-  store: IGatewayIncidentStore = incidentStore,
-  extras: IncidentRouterExtras = {},
-): Router {
+export function createIncidentRouter(deps: IncidentRouterDeps): Router {
   const router = Router();
   router.use(authMiddleware);
 
-  const pmStore = extras.pmStore ?? postmortemStore;
-  const generator = extras.generator;
+  const store = deps.store;
+  const investigationStore = deps.investigationStore;
+  const pmStore = deps.pmStore;
+  const generator = deps.generator;
 
   // POST /api/incidents - create
   router.post('/', requirePermission('incident:create'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -223,8 +222,8 @@ export function createIncidentRouter(
 
       // Return cached report unless force=true
       const body = req.body as { force?: boolean; executionResults?: unknown[]; verificationOutcomes?: unknown[] } | undefined;
-      if (!body?.force && pmStore.has(id)) {
-        res.json(pmStore.get(id));
+      if (!body?.force && await pmStore.has(id)) {
+        res.json(await pmStore.get(id));
         return;
       }
 
@@ -235,8 +234,10 @@ export function createIncidentRouter(
       }
 
       // Build investigation data from linked investigation IDs
-      const investigations = incident.investigationIds
-        .map((invId) => defaultInvestigationStore.findById(invId))
+      const resolvedInvs = await Promise.all(
+        incident.investigationIds.map((invId) => investigationStore.findById(invId)),
+      );
+      const investigations = resolvedInvs
         .filter(Boolean)
         .map((inv) => ({
           id: inv!.id,
@@ -274,7 +275,7 @@ export function createIncidentRouter(
       };
 
       const report = await generator.generate(input);
-      pmStore.set(id, report);
+      await pmStore.set(id, report);
       res.status(201).json(report);
     } catch (err) {
       next(err);
@@ -291,7 +292,7 @@ export function createIncidentRouter(
         return;
       }
 
-      const report = pmStore.get(id);
+      const report = await pmStore.get(id);
       if (!report) {
         const err: ApiError = { code: 'NOT_FOUND', message: 'Post-mortem report not yet generated. Use POST to generate one.' };
         res.status(404).json(err);
@@ -307,4 +308,3 @@ export function createIncidentRouter(
   return router;
 }
 
-export const incidentRouter = createIncidentRouter();

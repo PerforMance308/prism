@@ -4,6 +4,7 @@ import type { DashboardSseEvent } from '@agentic-obs/common'
 
 const log = createLogger('chat-handler')
 import type { IGatewayDashboardStore, IConversationStore } from '../../repositories/types.js'
+import type { IInvestigationReportRepository, IAlertRuleRepository } from '@agentic-obs/data-layer'
 import { DashboardService, withDashboardLock } from '../../services/dashboard-service.js'
 
 function sendEvent(res: Response, event: DashboardSseEvent): void {
@@ -20,6 +21,8 @@ export async function handleChatMessage(
   message: string,
   store: IGatewayDashboardStore,
   conversationStore: IConversationStore,
+  investigationReportStore: IInvestigationReportRepository,
+  alertRuleStore: IAlertRuleRepository,
 ): Promise<void> {
   const dashboard = await store.findById(dashboardId)
   if (!dashboard) {
@@ -43,7 +46,7 @@ export async function handleChatMessage(
 
   try {
     await withDashboardLock(dashboardId, async () => {
-      const service = new DashboardService(store, conversationStore)
+      const service = new DashboardService({ store, conversationStore, investigationReportStore, alertRuleStore })
       const result = await service.handleChatMessage(
         dashboardId,
         message,

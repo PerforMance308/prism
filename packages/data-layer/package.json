@@ -21,11 +21,13 @@
   "dependencies": {
     "@agentic-obs/agent-core": "*",
     "@agentic-obs/common": "*",
+    "better-sqlite3": "^12.8.0",
     "drizzle-orm": "^0.45.1",
     "ioredis": "^5.6.1",
     "pg": "^8.20.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/pg": "^8.15.6",
     "drizzle-kit": "^0.31.10",
     "typescript": "*",

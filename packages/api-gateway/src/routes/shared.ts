@@ -2,23 +2,19 @@
 
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { InMemoryShareRepository } from '@agentic-obs/data-layer';
 import type { IShareRepository } from '@agentic-obs/data-layer';
-import type { InvestigationStore } from '@agentic-obs/data-layer';
 import type { IGatewayInvestigationStore } from '../repositories/types.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 
-export const defaultShareRepo: IShareRepository = new InMemoryShareRepository();
-
 export interface SharedRouterDeps {
-  shareRepo?: IShareRepository;
-  investigationStore?: IGatewayInvestigationStore;
+  shareRepo: IShareRepository;
+  investigationStore: IGatewayInvestigationStore;
 }
 
-export function createSharedRouter(deps: SharedRouterDeps = {}): Router {
-  const shareRepo = deps.shareRepo ?? defaultShareRepo;
-  const investigationStore = deps.investigationStore!;
+export function createSharedRouter(deps: SharedRouterDeps): Router {
+  const shareRepo = deps.shareRepo;
+  const investigationStore = deps.investigationStore;
 
   const router = Router();
 
@@ -87,4 +83,3 @@ export function createSharedRouter(deps: SharedRouterDeps = {}): Router {
   return router;
 }
 
-export const sharedRouter = createSharedRouter();

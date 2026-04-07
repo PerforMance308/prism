@@ -4,7 +4,6 @@ import type { ApiError } from '@agentic-obs/common';
 import { authMiddleware } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 import {
-  feedStore,
   type FeedEventType,
   type FeedSeverity,
   type FeedStatus,
@@ -27,7 +26,7 @@ const VALID_FEED_TYPES: FeedEventType[] = [
   'verification_complete',
 ];
 
-export function createFeedRouter(store: IGatewayFeedStore = feedStore): Router {
+export function createFeedRouter(store: IGatewayFeedStore): Router {
   const router = Router();
 
   // All feed routes require authentication and feed:read permission
@@ -266,5 +265,3 @@ export function createFeedRouter(store: IGatewayFeedStore = feedStore): Router {
   return router;
 }
 
-// Default singleton router - preserves backward compatibility for imports.
-export const feedRouter = createFeedRouter();

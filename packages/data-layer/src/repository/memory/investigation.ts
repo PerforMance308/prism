@@ -1,13 +1,19 @@
 import { randomUUID } from 'crypto';
 import type { Investigation } from '@agentic-obs/common';
+import type { ExplanationResult } from '@agentic-obs/common';
 import type {
   IInvestigationRepository,
   InvestigationFindAllOptions,
 } from '../interfaces.js';
+import type { FollowUpRecord, FeedbackBody, StoredFeedback } from '../../stores/investigation-store.js';
 
 export class InMemoryInvestigationRepository implements IInvestigationRepository {
   private readonly active = new Map<string, Investigation>();
   private readonly archived = new Map<string, Investigation>();
+  private readonly followUps = new Map<string, FollowUpRecord[]>();
+  private readonly feedbackMap = new Map<string, StoredFeedback[]>();
+  private readonly conclusions = new Map<string, ExplanationResult>();
+  private readonly workspaceMap = new Map<string, string>();
 
   async findById(id: string): Promise<Investigation | undefined> {
     return this.active.get(id) ?? this.archived.get(id);
@@ -95,9 +101,80 @@ export class InMemoryInvestigationRepository implements IInvestigationRepository
     return [...this.archived.values()];
   }
 
+  async findByWorkspace(workspaceId: string): Promise<Investigation[]> {
+    return [...this.active.values()].filter(
+      (inv) => this.workspaceMap.get(inv.id) === workspaceId,
+    );
+  }
+
+  async addFollowUp(investigationId: string, question: string): Promise<FollowUpRecord> {
+    const record: FollowUpRecord = {
+      id: `fu_${randomUUID().slice(0, 8)}`,
+      investigationId,
+      question,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = this.followUps.get(investigationId) ?? [];
+    existing.push(record);
+    this.followUps.set(investigationId, existing);
+    return record;
+  }
+
+  async getFollowUps(investigationId: string): Promise<FollowUpRecord[]> {
+    return this.followUps.get(investigationId) ?? [];
+  }
+
+  async addFeedback(investigationId: string, body: FeedbackBody): Promise<StoredFeedback> {
+    const record: StoredFeedback = {
+      id: `fb_${randomUUID().slice(0, 8)}`,
+      investigationId,
+      ...body,
+      createdAt: new Date().toISOString(),
+    };
+    const existing = this.feedbackMap.get(investigationId) ?? [];
+    existing.push(record);
+    this.feedbackMap.set(investigationId, existing);
+    return record;
+  }
+
+  async getConclusion(id: string): Promise<ExplanationResult | undefined> {
+    return this.conclusions.get(id);
+  }
+
+  async setConclusion(id: string, conclusion: ExplanationResult): Promise<void> {
+    this.conclusions.set(id, conclusion);
+  }
+
+  async updateStatus(id: string, status: string): Promise<Investigation | undefined> {
+    return this.update(id, { status } as Partial<Omit<Investigation, 'id'>>);
+  }
+
+  async updatePlan(id: string, plan: Investigation['plan']): Promise<Investigation | undefined> {
+    return this.update(id, { plan } as Partial<Omit<Investigation, 'id'>>);
+  }
+
+  async updateResult(id: string, result: {
+    hypotheses: Investigation['hypotheses'];
+    evidence: Investigation['evidence'];
+    conclusion: ExplanationResult | null;
+  }): Promise<Investigation | undefined> {
+    const updated = await this.update(id, {
+      hypotheses: result.hypotheses,
+      evidence: result.evidence,
+    } as Partial<Omit<Investigation, 'id'>>);
+    if (updated && result.conclusion) {
+      this.conclusions.set(id, result.conclusion);
+    }
+    return updated;
+  }
+
   /** Test helper */
   clear(): void {
     this.active.clear();
     this.archived.clear();
+    this.followUps.clear();
+    this.feedbackMap.clear();
+    this.conclusions.clear();
+    this.workspaceMap.clear();
   }
 }

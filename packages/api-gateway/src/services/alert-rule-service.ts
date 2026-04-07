@@ -1,4 +1,5 @@
 import { DEFAULT_LLM_MODEL, type AlertRule } from '@agentic-obs/common';
+import type { IAlertRuleRepository } from '@agentic-obs/data-layer';
 import { defaultAlertRuleStore } from '@agentic-obs/data-layer';
 import { AlertRuleAgent } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
@@ -11,6 +12,12 @@ export interface GenerateAlertRuleResult {
 }
 
 export class AlertRuleService {
+  private readonly store: IAlertRuleRepository;
+
+  constructor(store: IAlertRuleRepository = defaultAlertRuleStore) {
+    this.store = store;
+  }
+
   /**
    * Generate an alert rule from a natural-language prompt using the LLM.
    * Pure business logic — no HTTP concepts.
@@ -31,7 +38,7 @@ export class AlertRuleService {
     const result = await agent.generate(prompt);
     const generated = result.rule;
 
-    const rule = defaultAlertRuleStore.create({
+    const rule = await this.store.create({
       name: generated.name,
       description: generated.description,
       originalPrompt: prompt,

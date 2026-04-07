@@ -1,9 +1,14 @@
-import { eq, isNull, isNotNull, and, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import type { Investigation } from '@agentic-obs/common';
 import type { ExplanationResult } from '@agentic-obs/common';
-import type { DbClient } from '../../db/client.js';
-import { investigations } from '../../db/schema.js';
+import type { SqliteClient } from '../../db/sqlite-client.js';
+import {
+  investigations,
+  investigationFollowUps,
+  investigationFeedback,
+  investigationConclusions,
+} from '../../db/sqlite-schema.js';
 import type {
   IInvestigationRepository,
   InvestigationFindAllOptions,
@@ -24,14 +29,15 @@ function rowToInvestigation(row: DbRow): Investigation {
     hypotheses: (row.hypotheses as Investigation['hypotheses']) ?? [],
     evidence: (row.evidence as Investigation['evidence']) ?? [],
     symptoms: (row.symptoms as Investigation['symptoms']) ?? [],
-    actions: [],
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
+    actions: (row.actions as Investigation['actions']) ?? [],
+    workspaceId: row.workspaceId ?? undefined,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
-export class PostgresInvestigationRepository implements IInvestigationRepository {
-  constructor(private readonly db: DbClient) {}
+export class SqliteInvestigationRepository implements IInvestigationRepository {
+  constructor(private readonly db: SqliteClient) {}
 
   async findById(id: string): Promise<Investigation | undefined> {
     const [row] = await this.db.select().from(investigations).where(eq(investigations.id, id));
@@ -39,7 +45,7 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
   }
 
   async findAll(opts: InvestigationFindAllOptions = {}): Promise<Investigation[]> {
-    const conditions = [isNull(investigations.archivedAt)];
+    const conditions = [eq(investigations.archived, false)];
     if (opts.tenantId) conditions.push(eq(investigations.tenantId, opts.tenantId));
     if (opts.status) conditions.push(eq(investigations.status, opts.status));
 
@@ -56,7 +62,7 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
   async create(
     data: Omit<Investigation, 'id' | 'createdAt'> & { id?: string },
   ): Promise<Investigation> {
-    const now = new Date();
+    const now = new Date().toISOString();
     const id = data.id ?? `inv_${randomUUID().slice(0, 8)}`;
     const [row] = await this.db
       .insert(investigations)
@@ -70,8 +76,10 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
         plan: data.plan as unknown as Record<string, unknown>,
         status: data.status,
         hypotheses: data.hypotheses,
+        actions: data.actions ?? [],
         evidence: data.evidence,
         symptoms: data.symptoms,
+        workspaceId: (data as Investigation & { workspaceId?: string }).workspaceId,
         createdAt: now,
         updatedAt: now,
       })
@@ -83,16 +91,18 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
     id: string,
     patch: Partial<Omit<Investigation, 'id'>>,
   ): Promise<Investigation | undefined> {
+    const sets: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    if (patch.status !== undefined) sets.status = patch.status;
+    if (patch.plan !== undefined) sets.plan = patch.plan;
+    if (patch.hypotheses !== undefined) sets.hypotheses = patch.hypotheses;
+    if (patch.evidence !== undefined) sets.evidence = patch.evidence;
+    if (patch.symptoms !== undefined) sets.symptoms = patch.symptoms;
+    if (patch.actions !== undefined) sets.actions = patch.actions;
+    if (patch.intent !== undefined) sets.intent = patch.intent;
+
     const [row] = await this.db
       .update(investigations)
-      .set({
-        ...(patch.status !== undefined ? { status: patch.status } : {}),
-        ...(patch.plan !== undefined ? { plan: patch.plan as unknown as Record<string, unknown> } : {}),
-        ...(patch.hypotheses !== undefined ? { hypotheses: patch.hypotheses } : {}),
-        ...(patch.evidence !== undefined ? { evidence: patch.evidence } : {}),
-        ...(patch.symptoms !== undefined ? { symptoms: patch.symptoms } : {}),
-        updatedAt: new Date(),
-      })
+      .set(sets)
       .where(eq(investigations.id, id))
       .returning();
 
@@ -100,15 +110,15 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.db.delete(investigations).where(eq(investigations.id, id));
-    return (result.rowCount ?? 0) > 0;
+    const result = await this.db.delete(investigations).where(eq(investigations.id, id)).returning();
+    return result.length > 0;
   }
 
   async count(): Promise<number> {
     const result = await this.db
       .select({ count: sql<number>`count(*)` })
       .from(investigations)
-      .where(isNull(investigations.archivedAt));
+      .where(eq(investigations.archived, false));
     return Number(result[0]?.count ?? 0);
   }
 
@@ -121,7 +131,7 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
   }
 
   async findByUser(userId: string, tenantId?: string): Promise<Investigation[]> {
-    const conditions = [eq(investigations.userId, userId), isNull(investigations.archivedAt)];
+    const conditions = [eq(investigations.userId, userId), eq(investigations.archived, false)];
     if (tenantId) conditions.push(eq(investigations.tenantId, tenantId));
     const rows = await this.db
       .select()
@@ -130,10 +140,18 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
     return rows.map(rowToInvestigation);
   }
 
+  async findByWorkspace(workspaceId: string): Promise<Investigation[]> {
+    const rows = await this.db
+      .select()
+      .from(investigations)
+      .where(and(eq(investigations.workspaceId, workspaceId), eq(investigations.archived, false)));
+    return rows.map(rowToInvestigation);
+  }
+
   async archive(id: string): Promise<Investigation | undefined> {
     const [row] = await this.db
       .update(investigations)
-      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .set({ archived: true, updatedAt: new Date().toISOString() })
       .where(eq(investigations.id, id))
       .returning();
     return row ? rowToInvestigation(row) : undefined;
@@ -142,14 +160,14 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
   async restore(id: string): Promise<Investigation | undefined> {
     const [row] = await this.db
       .update(investigations)
-      .set({ archivedAt: null, updatedAt: new Date() })
+      .set({ archived: false, updatedAt: new Date().toISOString() })
       .where(eq(investigations.id, id))
       .returning();
     return row ? rowToInvestigation(row) : undefined;
   }
 
   async findArchived(tenantId?: string): Promise<Investigation[]> {
-    const conditions = [isNotNull(investigations.archivedAt)];
+    const conditions = [eq(investigations.archived, true)];
     if (tenantId) conditions.push(eq(investigations.tenantId, tenantId));
     const rows = await this.db
       .select()
@@ -158,48 +176,92 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
     return rows.map(rowToInvestigation);
   }
 
-  async findByWorkspace(_workspaceId: string): Promise<Investigation[]> {
-    // Postgres schema does not have a workspaceId column — stub for interface compliance
-    return [];
-  }
+  // — Follow-ups
 
   async addFollowUp(investigationId: string, question: string): Promise<FollowUpRecord> {
-    // Postgres does not have a follow-ups table yet — store in-memory for now
-    return {
-      id: `fu_${randomUUID().slice(0, 8)}`,
-      investigationId,
-      question,
-      createdAt: new Date().toISOString(),
-    };
+    const now = new Date().toISOString();
+    const id = `fu_${randomUUID().slice(0, 8)}`;
+    const [row] = await this.db
+      .insert(investigationFollowUps)
+      .values({ id, investigationId, question, createdAt: now })
+      .returning();
+    return { id: row!.id, investigationId: row!.investigationId, question: row!.question, createdAt: row!.createdAt };
   }
 
-  async getFollowUps(_investigationId: string): Promise<FollowUpRecord[]> {
-    return [];
+  async getFollowUps(investigationId: string): Promise<FollowUpRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(investigationFollowUps)
+      .where(eq(investigationFollowUps.investigationId, investigationId));
+    return rows.map((r) => ({ id: r.id, investigationId: r.investigationId, question: r.question, createdAt: r.createdAt }));
   }
+
+  // — Feedback
 
   async addFeedback(investigationId: string, body: FeedbackBody): Promise<StoredFeedback> {
+    const now = new Date().toISOString();
+    const id = `fb_${randomUUID().slice(0, 8)}`;
+    const [row] = await this.db
+      .insert(investigationFeedback)
+      .values({
+        id,
+        investigationId,
+        helpful: body.helpful,
+        comment: body.comment ?? null,
+        rootCauseVerdict: body.rootCauseVerdict ?? null,
+        hypothesisFeedbacks: body.hypothesisFeedbacks ?? null,
+        actionFeedbacks: body.actionFeedbacks ?? null,
+        createdAt: now,
+      })
+      .returning();
     return {
-      id: `fb_${randomUUID().slice(0, 8)}`,
-      investigationId,
-      ...body,
-      createdAt: new Date().toISOString(),
+      id: row!.id,
+      investigationId: row!.investigationId,
+      helpful: row!.helpful,
+      comment: row!.comment ?? undefined,
+      rootCauseVerdict: row!.rootCauseVerdict as StoredFeedback['rootCauseVerdict'],
+      hypothesisFeedbacks: row!.hypothesisFeedbacks as StoredFeedback['hypothesisFeedbacks'],
+      actionFeedbacks: row!.actionFeedbacks as StoredFeedback['actionFeedbacks'],
+      createdAt: row!.createdAt,
     };
   }
 
-  async getConclusion(_id: string): Promise<ExplanationResult | undefined> {
-    return undefined;
+  // — Conclusions
+
+  async getConclusion(id: string): Promise<ExplanationResult | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(investigationConclusions)
+      .where(eq(investigationConclusions.investigationId, id));
+    return row ? (row.conclusion as ExplanationResult) : undefined;
   }
 
-  async setConclusion(_id: string, _conclusion: ExplanationResult): Promise<void> {
-    // no-op for Postgres stub
+  async setConclusion(id: string, conclusion: ExplanationResult): Promise<void> {
+    // Upsert: try insert, on conflict update
+    const existing = await this.db
+      .select()
+      .from(investigationConclusions)
+      .where(eq(investigationConclusions.investigationId, id));
+    if (existing.length > 0) {
+      await this.db
+        .update(investigationConclusions)
+        .set({ conclusion: conclusion as unknown as Record<string, unknown> })
+        .where(eq(investigationConclusions.investigationId, id));
+    } else {
+      await this.db
+        .insert(investigationConclusions)
+        .values({ investigationId: id, conclusion: conclusion as unknown as Record<string, unknown> });
+    }
   }
+
+  // — Orchestrator write-back
 
   async updateStatus(id: string, status: string): Promise<Investigation | undefined> {
-    return this.update(id, { status } as Partial<Omit<Investigation, 'id'>>);
+    return this.update(id, { status: status as Investigation['status'] });
   }
 
   async updatePlan(id: string, plan: Investigation['plan']): Promise<Investigation | undefined> {
-    return this.update(id, { plan } as Partial<Omit<Investigation, 'id'>>);
+    return this.update(id, { plan });
   }
 
   async updateResult(id: string, result: {
@@ -207,9 +269,13 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
     evidence: Investigation['evidence'];
     conclusion: ExplanationResult | null;
   }): Promise<Investigation | undefined> {
-    return this.update(id, {
+    const inv = await this.update(id, {
       hypotheses: result.hypotheses,
       evidence: result.evidence,
-    } as Partial<Omit<Investigation, 'id'>>);
+    });
+    if (inv && result.conclusion) {
+      await this.setConclusion(id, result.conclusion);
+    }
+    return inv;
   }
 }

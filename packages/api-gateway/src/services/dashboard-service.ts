@@ -4,10 +4,11 @@ import type { DashboardSseEvent } from '@agentic-obs/common';
 
 const log = createLogger('dashboard-service');
 import type { IGatewayDashboardStore, IConversationStore } from '../repositories/types.js';
-import { defaultInvestigationReportStore, defaultAlertRuleStore } from '@agentic-obs/data-layer';
+import type { IInvestigationReportRepository, IAlertRuleRepository } from '@agentic-obs/data-layer';
 import { getSetupConfig, type DatasourceConfig } from '../routes/setup.js';
 import { createLlmGateway } from '../routes/llm-factory.js';
 import { DashboardOrchestratorAgent as OrchestratorAgent } from '@agentic-obs/agent-core';
+import type { IDashboardAlertRuleStore as IAlertRuleStore } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
 
 // -- Prometheus resolution (shared across services)
@@ -59,11 +60,25 @@ export interface ChatResult {
   assistantMessageId: string;
 }
 
+export interface DashboardServiceDeps {
+  store: IGatewayDashboardStore;
+  conversationStore: IConversationStore;
+  investigationReportStore: IInvestigationReportRepository;
+  alertRuleStore: IAlertRuleRepository;
+}
+
 export class DashboardService {
-  constructor(
-    private store: IGatewayDashboardStore,
-    private conversationStore: IConversationStore,
-  ) {}
+  private store: IGatewayDashboardStore;
+  private conversationStore: IConversationStore;
+  private investigationReportStore: IInvestigationReportRepository;
+  private alertRuleStore: IAlertRuleRepository;
+
+  constructor(deps: DashboardServiceDeps) {
+    this.store = deps.store;
+    this.conversationStore = deps.conversationStore;
+    this.investigationReportStore = deps.investigationReportStore;
+    this.alertRuleStore = deps.alertRuleStore;
+  }
 
   /**
    * Process a chat message for a dashboard.
@@ -101,8 +116,8 @@ export class DashboardService {
       model,
       store: this.store,
       conversationStore: this.conversationStore,
-      investigationReportStore: defaultInvestigationReportStore,
-      alertRuleStore: defaultAlertRuleStore,
+      investigationReportStore: this.investigationReportStore,
+      alertRuleStore: this.alertRuleStore as unknown as IAlertRuleStore,
       metricsAdapter,
       allDatasources: config.datasources,
       sendEvent,

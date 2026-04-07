@@ -1,4 +1,4 @@
-import { eq, isNull, and } from 'drizzle-orm';
+import { eq, isNull, isNotNull, and } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import type {
   Incident,
@@ -164,5 +164,39 @@ export class PostgresIncidentRepository implements IIncidentRepository {
       .where(eq(incidents.id, id))
       .returning();
     return row ? rowToIncident(row) : undefined;
+  }
+
+  async findArchived(tenantId?: string): Promise<Incident[]> {
+    const conditions = [isNotNull(incidents.archivedAt)];
+    if (tenantId) conditions.push(eq(incidents.tenantId, tenantId));
+    const rows = await this.db
+      .select()
+      .from(incidents)
+      .where(and(...conditions));
+    return rows.map((r) => rowToIncident(r));
+  }
+
+  async findByWorkspace(_workspaceId: string): Promise<Incident[]> {
+    return [];
+  }
+
+  async addInvestigation(incidentId: string, investigationId: string): Promise<Incident | undefined> {
+    const incident = await this.findById(incidentId);
+    if (!incident) return undefined;
+    if (incident.investigationIds.includes(investigationId)) return incident;
+    // Store investigationIds in timeline entry since PG schema doesn't have the column
+    await this.addTimelineEntry(incidentId, {
+      type: 'investigation_created',
+      description: `Investigation ${investigationId} linked to incident`,
+      actorType: 'system',
+      actorId: 'incident-repo',
+      referenceId: investigationId,
+    });
+    return this.findById(incidentId);
+  }
+
+  async getTimeline(incidentId: string): Promise<IncidentTimelineEntry[] | undefined> {
+    const incident = await this.findById(incidentId);
+    return incident?.timeline;
   }
 }

@@ -5,8 +5,7 @@ import { randomUUID } from 'crypto'
 import type { AuthenticatedRequest } from '../../middleware/auth.js'
 import { authMiddleware } from '../../middleware/auth.js'
 import { requirePermission } from '../../middleware/rbac.js'
-import { defaultConversationStore } from '@agentic-obs/data-layer'
-import type { IGatewayDashboardStore, IConversationStore } from '@agentic-obs/data-layer'
+import type { IGatewayDashboardStore, IConversationStore, IInvestigationReportRepository, IAlertRuleRepository } from '@agentic-obs/data-layer'
 import { handleChatMessage } from './chat-handler.js'
 import { VariableResolver } from './variable-resolver.js'
 import type { PanelConfig } from '@agentic-obs/common'
@@ -18,13 +17,17 @@ import { createLogger } from '@agentic-obs/common'
 const log = createLogger('dashboard-router')
 
 export interface DashboardRouterDeps {
-  store?: IGatewayDashboardStore
-  conversationStore?: IConversationStore
+  store: IGatewayDashboardStore
+  conversationStore: IConversationStore
+  investigationReportStore: IInvestigationReportRepository
+  alertRuleStore: IAlertRuleRepository
 }
 
-export function createDashboardRouter(deps: DashboardRouterDeps = {}): ExpressRouter {
-  const store = deps.store!
-  const conversationStore = deps.conversationStore ?? defaultConversationStore
+export function createDashboardRouter(deps: DashboardRouterDeps): ExpressRouter {
+  const store = deps.store
+  const conversationStore = deps.conversationStore
+  const investigationReportStore = deps.investigationReportStore
+  const alertRuleStore = deps.alertRuleStore
 
   const router = Router()
 
@@ -57,7 +60,7 @@ export function createDashboardRouter(deps: DashboardRouterDeps = {}): ExpressRo
 
       // Trigger generation in background via the orchestrator agent (same path as chat)
       if (!body.stream) {
-        const service = new DashboardService(store, conversationStore)
+        const service = new DashboardService({ store, conversationStore, investigationReportStore, alertRuleStore })
         void withDashboardLock(dashboard.id, async () => {
           try {
             await service.handleChatMessage(
@@ -165,7 +168,7 @@ export function createDashboardRouter(deps: DashboardRouterDeps = {}): ExpressRo
         return
       }
       // Cascade: remove associated conversation messages
-      defaultConversationStore.deleteConversation(id)
+      conversationStore.deleteConversation(id)
       res.status(204).send()
     }
     catch (err) {
@@ -261,7 +264,7 @@ export function createDashboardRouter(deps: DashboardRouterDeps = {}): ExpressRo
         return
       }
 
-      await handleChatMessage(req, res, id, body.message.trim(), store, conversationStore)
+      await handleChatMessage(req, res, id, body.message.trim(), store, conversationStore, investigationReportStore, alertRuleStore)
     }
     catch (err) {
       next(err)
@@ -334,5 +337,3 @@ export function createDashboardRouter(deps: DashboardRouterDeps = {}): ExpressRo
   return router
 }
 
-// Default router instance using the module-level store
-export const dashboardRouter = createDashboardRouter()

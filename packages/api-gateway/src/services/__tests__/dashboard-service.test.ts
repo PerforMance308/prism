@@ -65,7 +65,12 @@ describe('DashboardService', () => {
     vi.clearAllMocks();
     dashboardStore = createMockDashboardStore();
     conversationStore = createMockConversationStore();
-    service = new DashboardService(dashboardStore, conversationStore);
+    service = new DashboardService({
+      store: dashboardStore,
+      conversationStore,
+      investigationReportStore: {} as any,
+      alertRuleStore: {} as any,
+    });
   });
 
   it('handleChatMessage() throws if LLM not configured', async () => {

@@ -12,6 +12,7 @@ import type {
 export class InMemoryIncidentRepository implements IIncidentRepository {
   private readonly active = new Map<string, Incident>();
   private readonly archived = new Map<string, Incident>();
+  private readonly workspaceMap = new Map<string, string>();
 
   async findById(id: string): Promise<Incident | undefined> {
     return this.active.get(id) ?? this.archived.get(id);
@@ -96,6 +97,31 @@ export class InMemoryIncidentRepository implements IIncidentRepository {
     return [...this.active.values()].filter((i) => i.serviceIds.includes(serviceId));
   }
 
+  async findByWorkspace(workspaceId: string): Promise<Incident[]> {
+    return [...this.active.values()].filter(
+      (inc) => this.workspaceMap.get(inc.id) === workspaceId,
+    );
+  }
+
+  async addInvestigation(incidentId: string, investigationId: string): Promise<Incident | undefined> {
+    const incident = this.active.get(incidentId);
+    if (!incident) return undefined;
+    if (incident.investigationIds.includes(investigationId)) return incident;
+    const updated: Incident = {
+      ...incident,
+      investigationIds: [...incident.investigationIds, investigationId],
+      updatedAt: new Date().toISOString(),
+    } as Incident;
+    this.active.set(incidentId, updated);
+    return updated;
+  }
+
+  async getTimeline(incidentId: string): Promise<IncidentTimelineEntry[] | undefined> {
+    const incident = this.active.get(incidentId);
+    if (!incident) return undefined;
+    return incident.timeline;
+  }
+
   async archive(id: string): Promise<Incident | undefined> {
     const item = this.active.get(id);
     if (!item) return undefined;
@@ -114,9 +140,14 @@ export class InMemoryIncidentRepository implements IIncidentRepository {
     return restored;
   }
 
+  async findArchived(_tenantId?: string): Promise<Incident[]> {
+    return [...this.archived.values()];
+  }
+
   /** Test helper */
   clear(): void {
     this.active.clear();
     this.archived.clear();
+    this.workspaceMap.clear();
   }
 }

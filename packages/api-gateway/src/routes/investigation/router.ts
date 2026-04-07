@@ -8,28 +8,29 @@ import type { AuthenticatedRequest } from '../../middleware/auth.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { requirePermission } from '../../middleware/rbac.js';
 import { investigationOpenApiSpec } from './openapi.js';
-import { defaultInvestigationStore, feedStore as defaultFeed, defaultShareStore, defaultInvestigationReportStore } from '@agentic-obs/data-layer';
-import type { SharePermission, IGatewayInvestigationStore, IGatewayFeedStore, IGatewayShareStore } from '@agentic-obs/data-layer';
+import type { SharePermission, IGatewayInvestigationStore, IGatewayFeedStore, IGatewayShareStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
 import type { CreateInvestigationBody, FollowUpBody, FeedbackBody } from './types.js';
 import { initSse, sendSseEvent, sendSseKeepAlive, closeSse } from './sse.js';
 import { LiveOrchestratorRunner } from './live-orchestrator-runner.js';
 import type { OrchestratorRunner } from './orchestrator-runner.js';
 import { getWorkspaceId } from '../../middleware/workspace-context.js';
 
-interface InvestigationRouterDeps {
-  store?: IGatewayInvestigationStore;
-  feed?: IGatewayFeedStore;
+export interface InvestigationRouterDeps {
+  store: IGatewayInvestigationStore;
+  feed: IGatewayFeedStore;
   orchestrator?: OrchestratorRunner;
-  shareRepo?: IGatewayShareStore;
+  shareRepo: IGatewayShareStore;
+  reportStore: IInvestigationReportRepository;
 }
 
 export function createInvestigationRouter(
-  deps: InvestigationRouterDeps = {},
+  deps: InvestigationRouterDeps,
 ): Router {
-  const store: IGatewayInvestigationStore = deps.store ?? defaultInvestigationStore;
-  const feed: IGatewayFeedStore = deps.feed ?? defaultFeed;
+  const store: IGatewayInvestigationStore = deps.store;
+  const feed: IGatewayFeedStore = deps.feed;
   const orchestrator: OrchestratorRunner = deps.orchestrator ?? new LiveOrchestratorRunner(store, feed);
-  const shareRepo: IGatewayShareStore = deps.shareRepo ?? defaultShareStore;
+  const shareRepo: IGatewayShareStore = deps.shareRepo;
+  const reportStore: IInvestigationReportRepository = deps.reportStore;
 
   const router = Router();
 
@@ -153,11 +154,11 @@ export function createInvestigationRouter(
         res.status(404).json({ code: 'NOT_FOUND', message: 'Investigation not found' });
         return;
       }
-      store.delete(id);
+      await store.delete(id);
       // Cascade: remove associated investigation reports
-      const reports = defaultInvestigationReportStore.findByDashboard(id);
+      const reports = await reportStore.findByDashboard(id);
       for (const r of reports) {
-        defaultInvestigationReportStore.delete(r.id);
+        await reportStore.delete(r.id);
       }
       res.status(204).end();
     } catch (err) {
@@ -176,7 +177,7 @@ export function createInvestigationRouter(
         return;
       }
       // Reports are stored with investigationId in the dashboardId field
-      const reports = defaultInvestigationReportStore.findByDashboard(id);
+      const reports = await reportStore.findByDashboard(id);
       if (!reports.length) {
         res.status(404).json({ code: 'NOT_FOUND', message: 'Report not yet available' });
         return;
@@ -378,8 +379,6 @@ export function createInvestigationRouter(
   return router;
 }
 
-// Default router instance using the module-level store
-export const InvestigationRouter = createInvestigationRouter();
 
 // OpenAPI spec endpoint (no auth required)
 export const openApiRouter = Router();
