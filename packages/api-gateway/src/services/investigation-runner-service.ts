@@ -11,7 +11,7 @@ import {
   type DashboardInvestigationOutput as InvestigationOutput,
 } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
-import { defaultInvestigationReportStore } from '@agentic-obs/data-layer';
+import type { IInvestigationReportRepository } from '@agentic-obs/data-layer';
 
 import { getSetupConfig } from '../routes/setup.js';
 import { createLlmGateway } from '../routes/llm-factory.js';
@@ -22,6 +22,7 @@ export class LiveOrchestratorRunner implements OrchestratorRunner {
   constructor(
     private readonly store: IGatewayInvestigationStore,
     private readonly feed: IGatewayFeedStore,
+    private readonly reportStore?: IInvestigationReportRepository,
   ) {}
 
   run(input: OrchestratorRunInput): void {
@@ -109,7 +110,7 @@ export class LiveOrchestratorRunner implements OrchestratorRunner {
       });
 
       // Save the LLM-generated narrative report
-      defaultInvestigationReportStore.save({
+      await this.reportStore?.save({
         id: randomUUID(),
         dashboardId: investigationId,
         goal: question,

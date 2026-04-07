@@ -188,7 +188,8 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
         userId: 'alert-system',
       });
 
-      const orchestrator = new LiveOrchestratorRunner(investigationStore, feedStoreInstance);
+      const dl2 = await import('@agentic-obs/data-layer');
+      const orchestrator = new LiveOrchestratorRunner(investigationStore, feedStoreInstance, dl2.defaultInvestigationReportStore);
       orchestrator.run({
         investigationId: investigation.id,
         question: investigation.intent,

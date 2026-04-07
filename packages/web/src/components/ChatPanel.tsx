@@ -281,7 +281,7 @@ function AgentActivityBlock({
             <>
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
               <span className="text-xs text-on-surface-variant truncate">{summaryText}</span>
-              <AnimatedDots />
+              {!expanded && <AnimatedDots />}
             </>
           ) : (
             <>

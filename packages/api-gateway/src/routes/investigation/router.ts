@@ -28,9 +28,9 @@ export function createInvestigationRouter(
 ): Router {
   const store: IGatewayInvestigationStore = deps.store;
   const feed: IGatewayFeedStore = deps.feed;
-  const orchestrator: OrchestratorRunner = deps.orchestrator ?? new LiveOrchestratorRunner(store, feed);
-  const shareRepo: IGatewayShareStore = deps.shareRepo;
   const reportStore: IInvestigationReportRepository = deps.reportStore;
+  const orchestrator: OrchestratorRunner = deps.orchestrator ?? new LiveOrchestratorRunner(store, feed, reportStore);
+  const shareRepo: IGatewayShareStore = deps.shareRepo;
 
   const router = Router();
 
