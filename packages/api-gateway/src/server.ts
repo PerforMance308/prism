@@ -35,7 +35,6 @@ import {
   createSqliteClient,
   createSqliteRepositories,
   ensureSchema,
-  migrateJsonToSqlite,
   EventEmittingFeedRepository,
   EventEmittingApprovalRepository,
   EventEmittingAlertRuleRepository,
@@ -252,21 +251,7 @@ export function startServer(port = 3000): void {
   const shutdown = new GracefulShutdown();
   const useSqlite = !process.env['DATABASE_URL'];
 
-  if (useSqlite) {
-    // SQLite mode: run migration from legacy JSON if needed
-    void (async () => {
-      try {
-        const dbPath = process.env['SQLITE_PATH'] || join(DATA_DIR, 'prism.db');
-        const db = createSqliteClient({ path: dbPath });
-        const result = await migrateJsonToSqlite(db, DATA_DIR);
-        if (result.migrated) {
-          log.info({ counts: result.counts }, 'Migrated stores.json to SQLite');
-        }
-      } catch (err) {
-        log.error({ err: err instanceof Error ? err.message : err }, 'JSON-to-SQLite migration failed');
-      }
-    })();
-  } else {
+  if (!useSqlite) {
     // Legacy in-memory mode: load JSON persistence
     void (async () => {
       const { setMarkDirty } = await import('@agentic-obs/data-layer');

@@ -17,7 +17,7 @@ import * as schema from './sqlite-schema.js';
 
 // -- Schema versioning ---------------------------------------------------------
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /**
  * Create all tables if they don't exist, and track schema version.
@@ -40,6 +40,12 @@ export function ensureSchema(db: SqliteClient): void {
 
   if (currentVersion >= SCHEMA_VERSION) {
     return; // Already up to date
+  }
+
+  // -- V2 migration: fix investigation_reports FK
+  if (currentVersion === 1) {
+    // SQLite can't ALTER TABLE to drop FK, so recreate the table
+    db.run(sql.raw(`DROP TABLE IF EXISTS investigation_reports`));
   }
 
   // Create all schema tables via Drizzle's push mechanism
