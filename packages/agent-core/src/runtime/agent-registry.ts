@@ -45,6 +45,15 @@ agentRegistry.register({
 });
 
 agentRegistry.register({
+  type: 'dashboard-editor',
+  description: 'Plans edits to existing dashboard panels, including modifications, removals, and layout adjustments',
+  allowedTools: ['modify_panel', 'remove_panels', 'rearrange', 'llm.complete', 'verifier.run'],
+  inputKinds: ['dashboard', 'panel'],
+  outputKinds: ['dashboard', 'panel'],
+  permissionMode: 'artifact_mutation',
+});
+
+agentRegistry.register({
   type: 'investigation-runner',
   description: 'Runs an observability investigation: plans queries, gathers evidence, and produces a structured report with evidence panels',
   allowedTools: ['investigate', 'prometheus.query', 'prometheus.labels', 'llm.complete'],

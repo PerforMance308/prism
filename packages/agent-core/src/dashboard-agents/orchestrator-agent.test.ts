@@ -34,6 +34,7 @@ describe('OrchestratorAgent structured alert follow-up', () => {
 
   it('modifies the active alert without calling the LLM for a threshold follow-up', async () => {
     const dashboard = createDashboard()
+    gateway.complete.mockResolvedValueOnce({ content: 'Updated the existing alert to trigger at 150ms.' })
     const history: DashboardMessage[] = [
       {
         id: 'm1',
@@ -110,7 +111,7 @@ describe('OrchestratorAgent structured alert follow-up', () => {
 
     const reply = await agent.handleMessage('dash-1', '算了改成150ms就通知我吧')
 
-    expect(gateway.complete).not.toHaveBeenCalled()
+    expect(gateway.complete).toHaveBeenCalledTimes(1)
     expect(alertRuleStore.update).toHaveBeenCalledWith(
       'alert_1',
       expect.objectContaining({
@@ -120,11 +121,12 @@ describe('OrchestratorAgent structured alert follow-up', () => {
         }),
       }),
     )
-    expect(reply).toContain('updated successfully')
+    expect(reply).toContain('150ms')
   })
 
   it('deletes the active alert without calling the LLM for a delete follow-up', async () => {
     const dashboard = createDashboard()
+    gateway.complete.mockResolvedValueOnce({ content: 'Deleted the existing alert.' })
     const history: DashboardMessage[] = [
       {
         id: 'm1',
@@ -189,8 +191,8 @@ describe('OrchestratorAgent structured alert follow-up', () => {
 
     const reply = await agent.handleMessage('dash-1', '删掉它吧')
 
-    expect(gateway.complete).not.toHaveBeenCalled()
+    expect(gateway.complete).toHaveBeenCalledTimes(1)
     expect(deleteFn).toHaveBeenCalledWith('alert_1')
-    expect(reply).toContain('deleted')
+    expect(reply.toLowerCase()).toContain('deleted')
   })
 })

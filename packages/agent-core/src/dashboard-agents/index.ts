@@ -6,6 +6,8 @@ export type { OrchestratorDeps } from './orchestrator-agent.js'
 export { DashboardGeneratorAgent } from './dashboard-generator-agent.js'
 export { PanelAdderAgent } from './panel-adder-agent.js'
 export type { PanelAdderInput, PanelAdderOutput } from './panel-adder-agent.js'
+export { PanelEditorAgent } from './panel-editor-agent.js'
+export type { PanelEditorInput, PanelEditorOutput } from './panel-editor-agent.js'
 
 export { PanelBuilderAgent } from './panel-builder-agent.js'
 export type { PanelBuilderInput, PanelBuilderOutput } from './panel-builder-agent.js'

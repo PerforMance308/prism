@@ -18,6 +18,7 @@ import type { IMetricsAdapter } from '../adapters/index.js'
 import type { LLMGateway } from '@agentic-obs/llm-gateway'
 import { DashboardGeneratorAgent } from './dashboard-generator-agent.js'
 import { PanelAdderAgent } from './panel-adder-agent.js'
+import { PanelEditorAgent } from './panel-editor-agent.js'
 import { InvestigationAgent } from './investigation-agent.js'
 import { ActionExecutor } from './action-executor.js'
 import { AlertRuleAgent } from './alert-rule-agent.js'
@@ -74,6 +75,7 @@ export class OrchestratorAgent {
   private readonly actionExecutor: ActionExecutor
   private readonly generatorAgent: DashboardGeneratorAgent
   private readonly panelAdderAgent: PanelAdderAgent
+  private readonly panelEditorAgent: PanelEditorAgent
   private readonly investigationAgent?: InvestigationAgent
   private readonly alertRuleAgent: AlertRuleAgent
   private readonly reactLoop: ReActLoop
@@ -92,6 +94,10 @@ export class OrchestratorAgent {
 
     this.generatorAgent = new DashboardGeneratorAgent(subAgentDeps)
     this.panelAdderAgent = new PanelAdderAgent(subAgentDeps)
+    this.panelEditorAgent = new PanelEditorAgent({
+      gateway: deps.gateway,
+      model: deps.model,
+    })
 
     if (deps.metricsAdapter) {
       this.investigationAgent = new InvestigationAgent({
@@ -142,44 +148,86 @@ export class OrchestratorAgent {
     return actions
   }
 
-  private normalizePanelPatch(
-    existingPanel: Dashboard['panels'][number] | undefined,
-    patch: Partial<Dashboard['panels'][number]>,
-  ): Partial<Dashboard['panels'][number]> {
-    const normalized = { ...patch }
+  private async executePanelEdit(
+    dashboardId: string,
+    userMessage: string,
+    requestedAction: 'modify_panel' | 'remove_panels' | 'rearrange',
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    const currentDash = await this.deps.store.findById(dashboardId)
+    if (!currentDash) throw new Error('Dashboard not found')
 
-    if ('queries' in normalized) {
-      const rawQueries = Array.isArray(normalized.queries) ? normalized.queries : []
-      const fallbackQueries = existingPanel?.queries ?? (existingPanel?.query ? [{ refId: 'A', expr: existingPanel.query, instant: existingPanel.visualization !== 'time_series' }] : [])
+    const displayText = requestedAction === 'modify_panel'
+      ? `Editing panels: ${userMessage}`
+      : requestedAction === 'remove_panels'
+        ? `Removing panel(s)`
+        : 'Rearranging panel layout'
 
-      const queries = rawQueries
-        .map((query, index) => {
-          const q = (query ?? {}) as Record<string, unknown>
-          const expr = typeof q.expr === 'string'
-            ? q.expr.trim()
-            : typeof q.query === 'string'
-              ? q.query.trim()
-              : typeof q.promql === 'string'
-                ? q.promql.trim()
-                : ''
-          if (!expr) return null
+    this.deps.sendEvent({
+      type: 'tool_call',
+      tool: requestedAction,
+      args,
+      displayText,
+    })
 
-          const fallbackRefId = fallbackQueries[index]?.refId ?? String.fromCharCode(65 + index)
-          return {
-            refId: typeof q.refId === 'string' && q.refId.trim() ? q.refId.trim() : fallbackRefId,
-            expr,
-            ...(typeof q.legendFormat === 'string' ? { legendFormat: q.legendFormat } : {}),
-            ...(typeof q.instant === 'boolean' ? { instant: q.instant } : {}),
-            ...(typeof q.datasourceId === 'string' ? { datasourceId: q.datasourceId } : {}),
-          }
-        })
-        .filter((query): query is NonNullable<typeof query> => query !== null)
+    const plan = await this.panelEditorAgent.planEdit({
+      userRequest: userMessage,
+      requestedAction,
+      requestedArgs: args,
+      dashboard: currentDash,
+    })
 
-      normalized.queries = queries
-      normalized.query = queries[0]?.expr ?? existingPanel?.query
+    if (plan.actions.length === 0) {
+      this.deps.sendEvent({
+        type: 'tool_result',
+        tool: requestedAction,
+        summary: plan.summary,
+        success: false,
+      })
+      this.emitAgentEvent(this.makeAgentEvent('agent.tool_completed', { tool: requestedAction, summary: plan.summary }))
+      return plan.summary
     }
 
-    return normalized
+    await this.actionExecutor.execute(dashboardId, plan.actions)
+
+    let verificationFailed = false
+    let verificationIssues = ''
+    const updatedDash = await this.deps.store.findById(dashboardId)
+    if (updatedDash) {
+      const verificationReport = await this.verifierAgent.verify('dashboard', updatedDash, {
+        metricsAdapter: this.deps.metricsAdapter,
+      })
+      this.deps.sendEvent({ type: 'verification_report', report: verificationReport })
+      this.emitAgentEvent(this.makeAgentEvent('agent.artifact_verified', {
+        tool: requestedAction,
+        status: verificationReport.status,
+        summary: verificationReport.summary,
+      }))
+
+      if (verificationReport.status === 'failed') {
+        verificationFailed = true
+        verificationIssues = verificationReport.issues
+          .filter((issue) => issue.severity === 'error')
+          .map((issue) => issue.message)
+          .join('; ')
+        await this.deps.store.updatePanels(dashboardId, currentDash.panels)
+      }
+    }
+
+    const observationText = verificationFailed
+      ? verificationIssues
+        ? `Panel edit was reverted because verification failed: ${verificationIssues}`
+        : 'Panel edit was reverted because verification failed.'
+      : plan.summary
+
+    this.deps.sendEvent({
+      type: 'tool_result',
+      tool: requestedAction,
+      summary: verificationFailed ? 'Panel edit reverted after verification failed' : plan.summary,
+      success: !verificationFailed,
+    })
+    this.emitAgentEvent(this.makeAgentEvent('agent.tool_completed', { tool: requestedAction, summary: observationText }))
+    return observationText
   }
 
   private getStructuredAlertRuleContext(history: DashboardMessage[], alertRules: AlertRuleContext[]): AlertRuleContext | null {
@@ -348,7 +396,7 @@ export class OrchestratorAgent {
       const result = await this.reactLoop.runLoop(
         systemPrompt,
         message,
-        (step) => this.executeAction(dashboardId, step),
+        (step) => this.executeAction(dashboardId, step, message),
       )
       this.emitAgentEvent(this.makeAgentEvent('agent.completed', { dashboardId }));
       return result;
@@ -362,7 +410,7 @@ export class OrchestratorAgent {
     }
   }
 
-  private async executeAction(dashboardId: string, step: ReActStep): Promise<string | null> {
+  private async executeAction(dashboardId: string, step: ReActStep, userMessage = ''): Promise<string | null> {
     const { action, args } = step
     const agentDef = OrchestratorAgent.definition;
 
@@ -703,117 +751,15 @@ export class OrchestratorAgent {
         }
 
         case 'remove_panels': {
-          const panelIds = Array.isArray(args.panelIds) ? (args.panelIds as string[]) : []
-          this.deps.sendEvent({
-            type: 'tool_call',
-            tool: 'remove_panels',
-            args: { panelIds },
-            displayText: `Removing ${panelIds.length} panel(s)`,
-          })
-
-          const removeAction: DashboardAction = { type: 'remove_panels', panelIds }
-          await this.actionExecutor.execute(dashboardId, [removeAction])
-          const observationText = `Removed ${panelIds.length} panel(s).`
-
-          this.deps.sendEvent({
-            type: 'tool_result',
-            tool: 'remove_panels',
-            summary: `Removed ${panelIds.length} panels`,
-            success: true,
-          })
-          this.emitAgentEvent(this.makeAgentEvent('agent.tool_completed', { tool: 'remove_panels', summary: observationText }));
-          return observationText
+          return this.executePanelEdit(dashboardId, userMessage, 'remove_panels', args)
         }
 
         case 'modify_panel': {
-          const panelId = String(args.panelId ?? '')
-          const rawPatch = (args.patch ?? {}) as Partial<Dashboard['panels'][number]>
-          const currentDash = await this.deps.store.findById(dashboardId)
-          if (!currentDash)
-            throw new Error('Dashboard not found')
-          const existingPanel = currentDash.panels.find((panel) => panel.id === panelId)
-          const patch = this.normalizePanelPatch(existingPanel, rawPatch)
-
-          this.deps.sendEvent({
-            type: 'tool_call',
-            tool: 'modify_panel',
-            args: { panelId, patch },
-            displayText: `Modifying panel: ${panelId}`,
-          })
-
-          const modifyAction: DashboardAction = { type: 'modify_panel', panelId, patch }
-          await this.actionExecutor.execute(dashboardId, [modifyAction])
-
-          const updatedDash = await this.deps.store.findById(dashboardId)
-          if (updatedDash) {
-            const verificationReport = await this.verifierAgent.verify('dashboard', updatedDash, {
-              metricsAdapter: this.deps.metricsAdapter,
-            })
-            this.deps.sendEvent({ type: 'verification_report', report: verificationReport })
-            this.emitAgentEvent(this.makeAgentEvent('agent.artifact_verified', {
-              tool: 'modify_panel',
-              status: verificationReport.status,
-              summary: verificationReport.summary,
-            }));
-
-            if (verificationReport.status === 'failed') {
-              await this.deps.store.updatePanels(dashboardId, currentDash.panels)
-              const failIssues = verificationReport.issues
-                .filter((i) => i.severity === 'error' && i.artifactId === panelId)
-                .map((i) => i.message)
-                .join('; ')
-              const observationText = failIssues
-                ? `Panel update was reverted because it would hide or distort data: ${failIssues}`
-                : 'Panel update was reverted because verification failed.'
-
-              this.deps.sendEvent({
-                type: 'tool_result',
-                tool: 'modify_panel',
-                summary: 'Panel update reverted after verification failed',
-                success: false,
-              })
-              this.emitAgentEvent(this.makeAgentEvent('agent.tool_completed', { tool: 'modify_panel', summary: observationText }));
-              return observationText
-            }
-          }
-
-          const observationText = `Modified panel ${panelId}.`
-
-          this.deps.sendEvent({
-            type: 'tool_result',
-            tool: 'modify_panel',
-            summary: `Panel ${panelId} modified`,
-            success: true,
-          })
-          this.emitAgentEvent(this.makeAgentEvent('agent.tool_completed', { tool: 'modify_panel', summary: observationText }));
-          return observationText
+          return this.executePanelEdit(dashboardId, userMessage, 'modify_panel', args)
         }
 
         case 'rearrange': {
-          const layout: Array<{ panelId: string, row: number, col: number, width: number, height: number }>
-            = Array.isArray(args.layout)
-              ? args.layout as Array<{ panelId: string, row: number, col: number, width: number, height: number }>
-              : []
-
-          this.deps.sendEvent({
-            type: 'tool_call',
-            tool: 'rearrange',
-            args: { layout },
-            displayText: `Rearranging ${layout.length} panel(s)`,
-          })
-
-          const rearrangeAction: DashboardAction = { type: 'rearrange', layout }
-          await this.actionExecutor.execute(dashboardId, [rearrangeAction])
-          const observationText = `Rearranged ${layout.length} panel(s).`
-
-          this.deps.sendEvent({
-            type: 'tool_result',
-            tool: 'rearrange',
-            summary: `Rearranged ${layout.length} panels`,
-            success: true,
-          })
-          this.emitAgentEvent(this.makeAgentEvent('agent.tool_completed', { tool: 'rearrange', summary: observationText }));
-          return observationText
+          return this.executePanelEdit(dashboardId, userMessage, 'rearrange', args)
         }
 
         case 'add_variable': {
