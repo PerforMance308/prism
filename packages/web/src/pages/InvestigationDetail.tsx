@@ -8,6 +8,7 @@ import type { ChatEvent } from '../hooks/useDashboardChat.js';
 import type { InvestigationReport as IReport, InvestigationReportSection } from '../hooks/useDashboardChat.js';
 import type { Evidence } from '@agentic-obs/common';
 import type { InvestigationStatus } from '../api/types.js';
+import { relativeTime } from '../utils/time.js';
 
 // Types
 
@@ -34,6 +35,7 @@ interface Hypothesis {
 interface FullInvestigation {
   id: string;
   intent: string;
+  sessionId: string;
   status: InvestigationStatus;
   plan: InvestigationPlan;
   hypotheses: Hypothesis[];
@@ -43,16 +45,6 @@ interface FullInvestigation {
 }
 
 // Helpers
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 function isTerminal(status: string) {
   return status === 'completed' || status === 'failed';
@@ -276,6 +268,8 @@ export default function InvestigationDetail() {
   const [report, setReport] = useState<IReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [agentEvents, setAgentEvents] = useState<ChatEvent[]>([]);
+  const [agentGenerating, setAgentGenerating] = useState(false);
 
   const fetchInvestigation = useCallback(async () => {
     if (!id) return;
@@ -312,19 +306,118 @@ export default function InvestigationDetail() {
   }, [investigation, fetchInvestigation]);
 
   // Build chat events from investigation state
-  const chatEvents = useMemo(() => {
+  const baseChatEvents = useMemo(() => {
     if (!investigation) return [];
     eventCounter = 0;
     return buildChatEvents(investigation, conclusion);
   }, [investigation, conclusion]);
 
-  const isGenerating = investigation ? !isTerminal(investigation.status) : false;
+  const chatEvents = useMemo(() => [...baseChatEvents, ...agentEvents], [baseChatEvents, agentEvents]);
+
+  const isGenerating = (investigation ? !isTerminal(investigation.status) : false) || agentGenerating;
 
   // Handle follow-up messages from ChatPanel
   const handleSendMessage = useCallback(async (content: string) => {
     if (!id) return;
-    await apiClient.post(`/investigations/${id}/follow-up`, { question: content });
-  }, [id]);
+    const userEventId = crypto.randomUUID();
+    setAgentEvents((prev) => [
+      ...prev,
+      {
+        id: userEventId,
+        kind: 'message',
+        message: {
+          id: userEventId,
+          role: 'user',
+          content,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    ]);
+    setAgentGenerating(true);
+
+    await apiClient.postStream(
+      '/agent/chat',
+      {
+        message: content,
+        sessionId: investigation?.sessionId ?? `ses_inv_${id}`,
+        context: { kind: 'investigation', id },
+      },
+      (eventType: string, rawData: string) => {
+        let parsed: Record<string, unknown> = {};
+        try {
+          parsed = JSON.parse(rawData) as Record<string, unknown>;
+        } catch {
+          parsed = { content: rawData };
+        }
+
+        const eventId = crypto.randomUUID();
+
+        if (eventType === 'thinking') {
+          setAgentEvents((prev) => [
+            ...prev,
+            {
+              id: eventId,
+              kind: 'thinking',
+              content: (parsed.content as string) ?? 'Thinking...',
+            },
+          ]);
+          return;
+        }
+
+        if (eventType === 'reply') {
+          setAgentEvents((prev) => [
+            ...prev,
+            {
+              id: eventId,
+              kind: 'message',
+              message: {
+                id: eventId,
+                role: 'assistant',
+                content: (parsed.content as string) ?? '',
+                timestamp: new Date().toISOString(),
+              },
+            },
+          ]);
+          return;
+        }
+
+        if (eventType === 'error') {
+          setAgentEvents((prev) => [
+            ...prev,
+            {
+              id: eventId,
+              kind: 'error',
+              content: (parsed.message as string) ?? 'Something went wrong',
+            },
+          ]);
+          setAgentGenerating(false);
+          return;
+        }
+
+        if (eventType === 'done') {
+          if (typeof parsed.navigate === 'string' && parsed.navigate !== `/investigations/${id}`) {
+            navigate(parsed.navigate);
+            return;
+          }
+          setAgentEvents((prev) => [...prev, { id: eventId, kind: 'done' }]);
+          setAgentGenerating(false);
+        }
+      },
+    ).catch((err) => {
+      const message = err instanceof Error ? err.message : 'Network error';
+      setAgentEvents((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          kind: 'error',
+          content: message,
+        },
+      ]);
+      setAgentGenerating(false);
+    }).finally(() => {
+      setAgentGenerating(false);
+    });
+  }, [id, investigation?.sessionId, navigate]);
 
   if (loading) {
     return (

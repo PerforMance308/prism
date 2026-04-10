@@ -117,6 +117,7 @@ export function useDashboardChat(
   const [panels, setPanels] = useState<PanelConfig[]>(initialPanels);
   const [variables, setVariables] = useState<DashboardVariable[]>(initialVariables);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef(`ses_dash_${dashboardId || crypto.randomUUID()}`);
   const historyLoadedRef = useRef(false);
 
   // Track whether SSE has modified panels during this generation cycle
@@ -144,7 +145,7 @@ export function useDashboardChat(
     void (async () => {
       const [chatRes, reportRes] = await Promise.all([
         apiClient.get<{ messages: ChatMessage[] }>(`/dashboards/${dashboardId}/chat`),
-        apiClient.get<InvestigationReport>(`/dashboards/${dashboardId}/investigation-report`),
+        apiClient.get<InvestigationReport>(`/investigation-reports/by-dashboard/${dashboardId}`),
       ]);
       if (chatRes.data?.messages?.length) {
         setMessages(chatRes.data.messages);
@@ -164,9 +165,11 @@ export function useDashboardChat(
           }));
         });
       }
-      // Restore saved investigation report if one exists
-      if (!reportRes.error && reportRes.data?.summary) {
-        setInvestigationReport(reportRes.data);
+      // Restore saved investigation report if one exists (API returns array, use latest)
+      if (!reportRes.error && reportRes.data) {
+        const reports = Array.isArray(reportRes.data) ? reportRes.data : [reportRes.data];
+        const latest = reports[reports.length - 1];
+        if (latest?.summary) setInvestigationReport(latest);
       }
       historyLoadedRef.current = true;
     })();
@@ -332,8 +335,13 @@ export function useDashboardChat(
 
       try {
         await apiClient.postStream(
-          `/dashboards/${dashboardId}/chat`,
-          { message: content, timeRange: resolveChatTimeRange(timeRange) },
+          `/agent/chat`,
+          {
+            message: content,
+            sessionId: sessionIdRef.current,
+            context: { kind: 'dashboard', id: dashboardId },
+            timeRange: resolveChatTimeRange(timeRange),
+          },
           handleSSEEvent,
           abortRef.current.signal,
         );

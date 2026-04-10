@@ -31,6 +31,7 @@ import { createWorkspaceRouter } from './routes/workspaces.js';
 import { createVersionRouter } from './routes/versions.js';
 import { createFolderRouter } from './routes/folders.js';
 import { createSearchRouter } from './routes/search.js';
+import { createAgentRouter } from './routes/agent.js';
 import {
   createSqliteClient,
   createSqliteRepositories,
@@ -171,6 +172,8 @@ export function createApp(): Application {
       conversationStore: repos.conversations as any,
       investigationReportStore: repos.investigationReports,
       alertRuleStore: eventAlertRuleStore,
+      investigationStore: repos.investigations as any,
+      feedStore: eventFeedStore as any,
     }));
     app.use('/api/alert-rules', createAlertRulesRouter({
       alertRuleStore: eventAlertRuleStore,
@@ -186,6 +189,14 @@ export function createApp(): Application {
     }));
     app.use('/api/workspaces', createWorkspaceRouter({ store: repos.workspaces as any }));
     app.use('/api/versions', createVersionRouter(repos.versions));
+    app.use('/api/agent', createAgentRouter({
+      dashboardStore: repos.dashboards as any,
+      conversationStore: repos.conversations as any,
+      investigationReportStore: repos.investigationReports,
+      alertRuleStore: eventAlertRuleStore,
+      investigationStore: repos.investigations as any,
+      feedStore: eventFeedStore,
+    }));
 
     // Store repos on app for startServer to access
     (app as any).__sqliteRepos = repos;
@@ -230,6 +241,8 @@ export function createApp(): Application {
       conversationStore: defaultConversationStore,
       investigationReportStore: defaultInvestigationReportStore,
       alertRuleStore: defaultAlertRuleStore,
+      investigationStore: defaultInvestigationStore,
+      feedStore,
     }));
     app.use('/api/alert-rules', createAlertRulesRouter({
       alertRuleStore: defaultAlertRuleStore,
@@ -245,6 +258,14 @@ export function createApp(): Application {
     }));
     app.use('/api/workspaces', createWorkspaceRouter({ store: defaultWorkspaceStore }));
     app.use('/api/versions', createVersionRouter(defaultVersionStore));
+    app.use('/api/agent', createAgentRouter({
+      dashboardStore: defaultDashboardStore,
+      conversationStore: defaultConversationStore,
+      investigationReportStore: defaultInvestigationReportStore,
+      alertRuleStore: defaultAlertRuleStore,
+      investigationStore: defaultInvestigationStore,
+      feedStore,
+    }));
   }
 
   mountStaticAssets(app);
