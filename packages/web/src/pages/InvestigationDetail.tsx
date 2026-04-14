@@ -50,16 +50,11 @@ function isTerminal(status: string) {
   return status === 'completed' || status === 'failed';
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  planning: 'Planning investigation steps...',
-  investigating: 'Querying data sources...',
-  evidencing: 'Collecting evidence...',
-  explaining: 'Analyzing findings...',
-  acting: 'Determining actions...',
-  verifying: 'Verifying results...',
-  completed: 'Investigation complete',
-  failed: 'Investigation failed',
-};
+import { getInvestigationStatusStyle } from '../constants/status-styles.js';
+
+function statusDescription(status: string): string {
+  return getInvestigationStatusStyle(status).description;
+}
 
 let eventCounter = 0;
 function makeEventId() { return `inv_evt_${++eventCounter}`; }
@@ -136,7 +131,7 @@ function buildChatEvents(investigation: FullInvestigation, conclusion: Conclusio
     events.push({
       id: makeEventId(),
       kind: 'thinking',
-      content: STATUS_LABELS[investigation.status] ?? 'Processing...',
+      content: statusDescription(investigation.status),
     });
   }
 
@@ -251,7 +246,7 @@ function LiveProgressView({ investigation }: { investigation: FullInvestigation 
       {!investigation.plan?.steps?.length && (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <span className="inline-block w-8 h-8 border-2 border-outline-variant border-t-primary rounded-full animate-spin mb-4" />
-          <p className="text-sm text-on-surface-variant">{STATUS_LABELS[investigation.status] ?? 'Working...'}</p>
+          <p className="text-sm text-on-surface-variant">{statusDescription(investigation.status)}</p>
         </div>
       )}
     </div>
@@ -478,7 +473,7 @@ export default function InvestigationDetail() {
             : 'bg-red-500/15 text-red-400'
         }`}>
           {isGenerating && <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />}
-          {STATUS_LABELS[investigation.status] ?? investigation.status}
+          {getInvestigationStatusStyle(investigation.status).label}
         </div>
       </div>
 
@@ -498,7 +493,7 @@ export default function InvestigationDetail() {
             <span className={`w-1.5 h-1.5 rounded-full ${isGenerating ? 'bg-primary animate-pulse' : investigation.status === 'completed' ? 'bg-secondary' : 'bg-red-400'}`} />
             <span className="text-xs text-on-surface-variant">
               {isGenerating
-                ? STATUS_LABELS[investigation.status]
+                ? statusDescription(investigation.status)
                 : investigation.status === 'completed'
                 ? `${investigation.evidence?.length ?? 0} evidence · ${investigation.hypotheses?.length ?? 0} hypotheses`
                 : 'Failed'

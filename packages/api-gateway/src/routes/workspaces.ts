@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import type { Request, Response, NextFunction } from 'express';
-import type { ApiError } from '@agentic-obs/common';
+import type { Response, NextFunction } from 'express';
+import type { ApiError, WorkspaceSettings } from '@agentic-obs/common';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { IWorkspaceRepository } from '@agentic-obs/data-layer';
 import { defaultWorkspaceStore } from '@agentic-obs/data-layer';
@@ -11,15 +12,28 @@ export interface WorkspaceRouterDeps {
   store?: IWorkspaceRepository;
 }
 
+/**
+ * Returns the requesting user's role within a workspace, or undefined if they are not a member.
+ * The workspace owner is always treated as 'owner' even if not in the members array.
+ */
+function getMemberRole(
+  workspace: import('@agentic-obs/common').Workspace,
+  userId: string,
+): 'owner' | 'admin' | 'editor' | 'viewer' | undefined {
+  if (workspace.ownerId === userId) return 'owner';
+  const member = workspace.members.find((m) => m.userId === userId);
+  return member?.role;
+}
+
 export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
   const store: IWorkspaceRepository = deps.store ?? defaultWorkspaceStore;
   const router = Router();
   router.use(authMiddleware);
 
   // GET /api/workspaces - list workspaces for current user
-  router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+  router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as any).userId as string | undefined;
+      const userId = req.auth?.sub;
       if (!userId) {
         const err: ApiError = { code: 'UNAUTHORIZED', message: 'authentication required' };
         res.status(401).json(err);
@@ -31,9 +45,9 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
   });
 
   // POST /api/workspaces - create workspace
-  router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const userId = (req as any).userId as string | undefined;
+      const userId = req.auth?.sub;
       if (!userId) {
         const err: ApiError = { code: 'UNAUTHORIZED', message: 'authentication required' };
         res.status(401).json(err);
@@ -43,7 +57,7 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
       const { name, slug, settings } = req.body as {
         name?: string;
         slug?: string;
-        settings?: Record<string, unknown>;
+        settings?: WorkspaceSettings;
       };
 
       if (typeof name !== 'string' || !name.trim()) {
@@ -72,36 +86,61 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
         name: name.trim(),
         slug,
         ownerId: userId,
-        settings: settings as any,
+        settings,
       });
 
       res.status(201).json(workspace);
     } catch (err) { next(err); }
   });
 
-  // GET /api/workspaces/:id - get workspace
-  router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  // GET /api/workspaces/:id - get workspace (members only)
+  router.get('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
+      const userId = req.auth?.sub;
+      if (!userId) { res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' } satisfies ApiError); return; }
+
       const workspace = await store.findById(req.params['id']!);
       if (!workspace) {
         const err: ApiError = { code: 'NOT_FOUND', message: 'workspace not found' };
         res.status(404).json(err);
         return;
       }
+
+      if (!getMemberRole(workspace, userId)) {
+        res.status(403).json({ code: 'FORBIDDEN', message: 'you are not a member of this workspace' } satisfies ApiError);
+        return;
+      }
+
       res.json(workspace);
     } catch (err) { next(err); }
   });
 
-  // PUT /api/workspaces/:id - update workspace
-  router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  // PUT /api/workspaces/:id - update workspace (owner/admin only)
+  router.put('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
+      const userId = req.auth?.sub;
+      if (!userId) { res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' } satisfies ApiError); return; }
+
+      const workspace = await store.findById(req.params['id']!);
+      if (!workspace) {
+        const err: ApiError = { code: 'NOT_FOUND', message: 'workspace not found' };
+        res.status(404).json(err);
+        return;
+      }
+
+      const role = getMemberRole(workspace, userId);
+      if (role !== 'owner' && role !== 'admin') {
+        res.status(403).json({ code: 'FORBIDDEN', message: 'only workspace owner or admin can update settings' } satisfies ApiError);
+        return;
+      }
+
       const { name, slug, settings } = req.body as {
         name?: string;
         slug?: string;
-        settings?: Record<string, unknown>;
+        settings?: WorkspaceSettings;
       };
 
-      const patch: Record<string, unknown> = {};
+      const patch: Partial<Pick<import('@agentic-obs/common').Workspace, 'name' | 'slug' | 'settings'>> = {};
       if (name !== undefined) {
         if (typeof name !== 'string' || !name.trim()) {
           const err: ApiError = { code: 'INVALID_INPUT', message: 'name must be a non-empty string' };
@@ -128,7 +167,7 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
         patch.settings = settings;
       }
 
-      const updated = await store.update(req.params['id']!, patch as any);
+      const updated = await store.update(req.params['id']!, patch);
       if (!updated) {
         const err: ApiError = { code: 'NOT_FOUND', message: 'workspace not found' };
         res.status(404).json(err);
@@ -138,22 +177,48 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
     } catch (err) { next(err); }
   });
 
-  // DELETE /api/workspaces/:id - delete workspace
-  router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  // DELETE /api/workspaces/:id - delete workspace (owner only)
+  router.delete('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const deleted = await store.delete(req.params['id']!);
-      if (!deleted) {
+      const userId = req.auth?.sub;
+      if (!userId) { res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' } satisfies ApiError); return; }
+
+      const workspace = await store.findById(req.params['id']!);
+      if (!workspace) {
         const err: ApiError = { code: 'NOT_FOUND', message: 'workspace not found' };
         res.status(404).json(err);
         return;
       }
+
+      if (getMemberRole(workspace, userId) !== 'owner') {
+        res.status(403).json({ code: 'FORBIDDEN', message: 'only the workspace owner can delete it' } satisfies ApiError);
+        return;
+      }
+
+      await store.delete(req.params['id']!);
       res.status(204).end();
     } catch (err) { next(err); }
   });
 
-  // POST /api/workspaces/:id/members - add member
-  router.post('/:id/members', async (req: Request, res: Response, next: NextFunction) => {
+  // POST /api/workspaces/:id/members - add member (owner/admin only)
+  router.post('/:id/members', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
+      const callerId = req.auth?.sub;
+      if (!callerId) { res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' } satisfies ApiError); return; }
+
+      const workspace = await store.findById(req.params['id']!);
+      if (!workspace) {
+        const err: ApiError = { code: 'NOT_FOUND', message: 'workspace not found' };
+        res.status(404).json(err);
+        return;
+      }
+
+      const callerRole = getMemberRole(workspace, callerId);
+      if (callerRole !== 'owner' && callerRole !== 'admin') {
+        res.status(403).json({ code: 'FORBIDDEN', message: 'only workspace owner or admin can manage members' } satisfies ApiError);
+        return;
+      }
+
       const { userId, role } = req.body as { userId?: string; role?: string };
 
       if (typeof userId !== 'string' || !userId.trim()) {
@@ -163,7 +228,7 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
       }
 
       const validRoles = ['admin', 'editor', 'viewer'] as const;
-      if (!role || !validRoles.includes(role as any)) {
+      if (!role || !(validRoles as readonly string[]).includes(role)) {
         const err: ApiError = { code: 'INVALID_INPUT', message: `role must be one of: ${validRoles.join(', ')}` };
         res.status(400).json(err);
         return;
@@ -184,13 +249,22 @@ export function createWorkspaceRouter(deps: WorkspaceRouterDeps = {}): Router {
     } catch (err) { next(err); }
   });
 
-  // DELETE /api/workspaces/:id/members/:userId - remove member
-  router.delete('/:id/members/:userId', async (req: Request, res: Response, next: NextFunction) => {
+  // DELETE /api/workspaces/:id/members/:userId - remove member (owner/admin only)
+  router.delete('/:id/members/:userId', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
+      const callerId = req.auth?.sub;
+      if (!callerId) { res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' } satisfies ApiError); return; }
+
       const workspace = await store.findById(req.params['id']!);
       if (!workspace) {
         const err: ApiError = { code: 'NOT_FOUND', message: 'workspace not found' };
         res.status(404).json(err);
+        return;
+      }
+
+      const callerRole = getMemberRole(workspace, callerId);
+      if (callerRole !== 'owner' && callerRole !== 'admin') {
+        res.status(403).json({ code: 'FORBIDDEN', message: 'only workspace owner or admin can remove members' } satisfies ApiError);
         return;
       }
 

@@ -1,0 +1,96 @@
+replicaCount: 1
+
+image:
+  repository: openobs
+  tag: latest
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 10001
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: openobs.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+  storageClassName: ""
+  mountPath: /var/lib/openobs
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+env:
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: "3000"
+  DATA_DIR: /var/lib/openobs
+  LOG_LEVEL: info
+  LOG_FORMAT: json
+  CORS_ORIGINS: ""
+  LLM_PROVIDER: anthropic
+  LLM_MODEL: claude-sonnet-4-6
+  LLM_FALLBACK_PROVIDER: ""
+  DATABASE_POOL_SIZE: "10"
+  DATABASE_SSL: "false"
+  REDIS_PREFIX: "agentic"
+  API_KEY_HEADER: x-api-key
+  SESSION_TTL: "86400"
+  PROACTIVE_CHECK_INTERVAL_MS: "60000"
+  PROACTIVE_HISTORY_SIZE: "100"
+  extra: {}
+
+secretEnv:
+  JWT_SECRET: ""
+  LLM_API_KEY: ""
+  API_KEYS: ""
+  DATABASE_URL: ""
+  REDIS_URL: ""
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  GEMINI_API_KEY: ""
+  SEED_ADMIN: ""
+  SEED_ADMIN_EMAIL: ""
+  SEED_ADMIN_PASSWORD: ""
+
+existingSecret: ""

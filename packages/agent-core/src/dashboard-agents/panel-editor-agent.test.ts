@@ -88,7 +88,7 @@ describe('PanelEditorAgent', () => {
     })
 
     const result = await agent.planEdit({
-      userRequest: '把 p95 和 p99 这两个 panel 合并成 1 个',
+      userRequest: 'merge the p95 and p99 panels into one',
       requestedAction: 'modify_panel',
       requestedArgs: {
         panelId: 'panel-p95',
@@ -136,7 +136,7 @@ describe('PanelEditorAgent', () => {
     })
 
     const result = await agent.planEdit({
-      userRequest: '删掉 p99 panel',
+      userRequest: 'remove the p99 panel',
       requestedAction: 'remove_panels',
       requestedArgs: {
         panelIds: ['panel-p99'],
@@ -215,7 +215,7 @@ describe('PanelEditorAgent', () => {
     })
 
     const result = await agent.planEdit({
-      userRequest: '把这个单值 panel 拆成 p95 和 p99 两个面板',
+      userRequest: 'split this stat panel into separate p95 and p99 panels',
       requestedAction: 'modify_panel',
       requestedArgs: {
         panelId: 'panel-p95',
@@ -252,7 +252,7 @@ describe('PanelEditorAgent', () => {
     })
 
     const result = await agent.planEdit({
-      userRequest: 'p99 latency放到第一个',
+      userRequest: 'move p99 latency to the first position',
       requestedAction: 'rearrange',
       requestedArgs: {
         layout: [

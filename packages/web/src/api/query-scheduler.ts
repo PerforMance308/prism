@@ -111,7 +111,9 @@ export class QueryScheduler {
         .then((result) => {
           this.cache.set(key, { data: result, timestamp: Date.now() });
         })
-        .catch((err) => { console.warn('[query-scheduler] scheduled query failed', err); })
+        // Errors surface via the original `promise` returned to the caller,
+        // so swallow them here just to mark the derived chain as handled.
+        .catch(() => {})
         .finally(() => {
           this.inflight.delete(key);
         });
@@ -145,7 +147,7 @@ export class QueryScheduler {
       .then((result) => {
         this.cache.set(key, { data: result, timestamp: Date.now() });
       })
-      .catch((err) => { console.warn('[query-scheduler] immediate query failed', err); })
+      .catch(() => {})
       .finally(() => {
         this.inflight.delete(key);
       });

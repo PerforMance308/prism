@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import type { Workspace, WorkspaceMember } from '@agentic-obs/common';
 import type { SqliteClient } from '../../db/sqlite-client.js';
+import { toJsonColumn } from '../json-column.js';
 import { workspaces } from '../../db/sqlite-schema.js';
 import type { IWorkspaceRepository } from '../interfaces.js';
 
@@ -45,7 +46,7 @@ export class SqliteWorkspaceRepository implements IWorkspaceRepository {
         slug: params.slug,
         ownerId: params.ownerId,
         members: members as unknown[],
-        settings: (params.settings ?? {}) as unknown as Record<string, unknown>,
+        settings: toJsonColumn(params.settings ?? {}),
         createdAt: now,
         updatedAt: now,
       })

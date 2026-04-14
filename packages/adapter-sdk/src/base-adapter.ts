@@ -9,7 +9,7 @@ import type {
   ValidationResult,
   DryRunResult,
   ExecutionResult,
-} from '@agentic-obs/agent-core';
+} from '@agentic-obs/common';
 import type { AdapterManifest } from './types.js';
 
 /**
@@ -76,7 +76,7 @@ export abstract class BaseAdapter implements ExecutionAdapter {
         output: null,
         rollbackable: false,
         executionId: this.generateExecutionId(),
-        errors: [validation.reason],
+        error: validation.reason,
       };
     }
 

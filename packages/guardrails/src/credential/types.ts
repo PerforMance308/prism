@@ -34,32 +34,3 @@ export interface CredentialResolver {
   canResolve(ref: string): boolean;
 }
 
-/**
- * A chain of resolvers tried in order.
- * The first resolver that `canResolve(ref)` handles the ref.
- */
-export class CredentialResolverChain implements CredentialResolver {
-  private readonly resolvers: CredentialResolver[];
-
-  constructor(resolvers: CredentialResolver[] = []) {
-    this.resolvers = resolvers;
-  }
-
-  add(resolver: CredentialResolver): this {
-    this.resolvers.push(resolver);
-    return this;
-  }
-
-  canResolve(ref: string): boolean {
-    return this.resolvers.some((r) => r.canResolve(ref));
-  }
-
-  async resolve(ref: string): Promise<ResolvedCredential | undefined> {
-    for (const resolver of this.resolvers) {
-      if (resolver.canResolve(ref)) {
-        return resolver.resolve(ref);
-      }
-    }
-    return undefined;
-  }
-}

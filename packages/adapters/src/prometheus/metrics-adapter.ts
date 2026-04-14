@@ -1,7 +1,8 @@
 // Types are structurally compatible with IMetricsAdapter from @agentic-obs/agent-core.
 // We avoid importing from agent-core directly to prevent a circular package dependency.
 
-import { createLogger } from '@agentic-obs/common';
+import { createLogger, getErrorMessage } from '@agentic-obs/common';
+import { checkEndpointHealth } from '../shared/health-check.js';
 
 const log = createLogger('metrics-adapter');
 
@@ -192,18 +193,15 @@ export class PrometheusMetricsAdapter {
       }
       return { ok: true };
     } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      return { ok: false, error: getErrorMessage(err) };
     }
   }
 
   async isHealthy(): Promise<boolean> {
-    try {
-      const res = await this.fetch(`${this.base}/-/healthy`, 5_000);
-      return res.ok;
-    } catch (err) {
-      log.debug({ err }, 'failed to check Prometheus health');
-      return false;
-    }
+    return checkEndpointHealth(`${this.base}/-/healthy`, {
+      logger: log,
+      timeoutMs: 5_000,
+    });
   }
 
   private get base(): string {

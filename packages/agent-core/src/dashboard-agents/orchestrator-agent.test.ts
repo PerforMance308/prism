@@ -109,7 +109,7 @@ describe('OrchestratorAgent structured alert follow-up', () => {
       sendEvent,
     })
 
-    const reply = await agent.handleMessage('dash-1', '算了改成150ms就通知我吧')
+    const reply = await agent.handleMessage('dash-1', 'just change it to 150ms and notify me')
 
     expect(gateway.complete).toHaveBeenCalledTimes(1)
     expect(alertRuleStore.update).toHaveBeenCalledWith(
@@ -189,7 +189,7 @@ describe('OrchestratorAgent structured alert follow-up', () => {
       sendEvent,
     })
 
-    const reply = await agent.handleMessage('dash-1', '删掉它吧')
+    const reply = await agent.handleMessage('dash-1', 'delete it')
 
     expect(gateway.complete).toHaveBeenCalledTimes(1)
     expect(deleteFn).toHaveBeenCalledWith('alert_1')
@@ -239,7 +239,7 @@ describe('OrchestratorAgent panel explanation', () => {
     }
 
     gateway.complete.mockResolvedValueOnce({
-      content: '过去 1 小时 Average Latency 基本稳定，最新值约 0.24 秒，区间大约在 0.21 到 0.27 秒之间，没有明显恶化趋势。',
+      content: 'Over the past hour, Average Latency has been stable around 0.24s, ranging from 0.21s to 0.27s with no significant degradation trend.',
     })
 
     const agent = new OrchestratorAgent({
@@ -286,13 +286,13 @@ describe('OrchestratorAgent panel explanation', () => {
       sendEvent,
     })
 
-    const reply = await agent.handleMessage('dash-1', '帮我讲一下Average latency的数据情况')
+    const reply = await agent.handleMessage('dash-1', 'explain the Average Latency data trend')
 
     expect(reply).toContain('Average Latency')
     expect(gateway.complete).toHaveBeenCalledTimes(1)
     expect(sendEvent).toHaveBeenCalledWith({
       type: 'reply',
-      content: '过去 1 小时 Average Latency 基本稳定，最新值约 0.24 秒，区间大约在 0.21 到 0.27 秒之间，没有明显恶化趋势。',
+      content: 'Over the past hour, Average Latency has been stable around 0.24s, ranging from 0.21s to 0.27s with no significant degradation trend.',
     })
   })
 })

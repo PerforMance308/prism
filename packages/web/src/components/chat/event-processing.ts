@@ -1,0 +1,210 @@
+import type { ChatEvent } from '../../hooks/useDashboardChat.js';
+
+// Block grouping
+
+interface MessageBlock {
+  type: 'message';
+  event: ChatEvent;
+}
+interface AgentBlock {
+  type: 'agent';
+  events: ChatEvent[];
+  id: string;
+}
+export type Block = MessageBlock | AgentBlock;
+
+export function groupEvents(events: ChatEvent[]): Block[] {
+  const blocks: Block[] = [];
+  let currentAgent: ChatEvent[] = [];
+
+  const flushAgent = () => {
+    if (currentAgent.length > 0) {
+      blocks.push({ type: 'agent', events: [...currentAgent], id: currentAgent[0]!.id });
+      currentAgent = [];
+    }
+  };
+
+  for (const evt of events) {
+    if (evt.kind === 'message' || evt.kind === 'error') {
+      flushAgent();
+      blocks.push({ type: 'message', event: evt });
+    } else if (evt.kind === 'done') {
+      flushAgent();
+    } else {
+      currentAgent.push(evt);
+    }
+  }
+
+  flushAgent();
+  return blocks;
+}
+
+// Step processing
+
+// Phase-grouped step builder.
+// Multiple tool events that belong to the same phase merge into one step
+// with in-place status updates instead of adding new rows.
+
+export interface StepRow {
+  id: string;
+  phase: string;
+  label: string;
+  status: string;
+  result?: { text: string; success: boolean };
+  done: boolean;
+  subStepCount: number;
+}
+
+export const USER_VISIBLE_TOOLS = new Set([
+  // Orchestrator-level actions
+  'generate_dashboard',
+  'add_panels',
+  'remove_panels',
+  'modify_panel',
+  'rearrange',
+  'add_variable',
+  'set_title',
+  'investigate',
+  'create_alert_rule',
+  'modify_alert_rule',
+  'delete_alert_rule',
+  // Dashboard generation sub-phases
+  'research',
+  'web_search',
+  'discover',
+  'discover_metrics',
+  'discover_labels',
+  'sample_metrics',
+  'fetch_metadata',
+  'planner',
+  'build_progress',
+  'validate_query',
+  'fix_query',
+  'critic',
+  // Investigation sub-phases
+  'investigate_plan',
+  'investigate_query',
+  'investigate_analyze',
+]);
+
+/**
+ * Derive a phase key from a tool name.
+ * Tools sharing a phase merge into one step row.
+ * Convention: tool names with common prefix group together.
+ */
+export function phaseOf(tool: string): string {
+  // Underscore-delimited prefix grouping
+  // discover_metrics, discover_labels, sample_metrics → discover
+  // investigate_plan, investigate_query, investigate_analyze → investigate
+  // generate_group, generate_panels → generate
+  // panel_adder_generate, panel_adder_critic → panel_adder
+  // web_search → research (special case since research agent calls it)
+  if (tool === 'web_search') return 'research';
+  if (tool === 'sample_metrics') return 'discover';
+  if (tool === 'validate_query' || tool === 'fix_query') return 'generate';
+  if (tool === 'critic' || tool === 'build_progress') return 'generate';
+
+  const parts = tool.split('_');
+  return parts.length > 1 ? parts.slice(0, -1).join('_') : tool;
+}
+
+export const TOOL_LABELS: Record<string, string> = {
+  // Dashboard generation phases
+  research: 'Researching',
+  web_search: 'Researching',
+  discover: 'Discovering metrics',
+  discover_metrics: 'Discovering metrics',
+  discover_labels: 'Discovering labels',
+  sample_metrics: 'Sampling metrics',
+  fetch_metadata: 'Fetching metadata',
+  planner: 'Planning dashboard',
+  build_progress: 'Building panels',
+  generate_dashboard: 'Generating dashboard',
+  validate_query: 'Validating queries',
+  fix_query: 'Fixing queries',
+  critic: 'Reviewing panels',
+  // Panel operations
+  add_panels: 'Adding panels',
+  remove_panels: 'Removing panels',
+  modify_panel: 'Modifying panel',
+  rearrange: 'Rearranging layout',
+  add_variable: 'Adding variable',
+  set_title: 'Setting title',
+  // Investigation
+  investigate: 'Investigating',
+  investigate_plan: 'Planning investigation',
+  investigate_query: 'Querying Prometheus',
+  investigate_analyze: 'Analyzing evidence',
+  // Alerts
+  create_alert_rule: 'Creating alert',
+  modify_alert_rule: 'Updating alert',
+  delete_alert_rule: 'Deleting alert',
+};
+
+export function buildSteps(events: ChatEvent[]): { steps: StepRow[]; preStatus: string | null } {
+  const steps: StepRow[] = [];
+  const phaseMap = new Map<string, StepRow>();
+  let preStatus: string | null = null;
+
+  for (const evt of events) {
+    if (evt.kind === 'thinking') {
+      const active = [...steps].reverse().find((s) => !s.done);
+      if (active) {
+        active.status = evt.content ?? active.status;
+      } else {
+        preStatus = evt.content ?? null;
+      }
+      continue;
+    }
+
+    if (evt.kind === 'tool_call') {
+      const tool = evt.tool ?? 'unknown';
+      if (!USER_VISIBLE_TOOLS.has(tool)) {
+        continue;
+      }
+      const phase = phaseOf(tool);
+      const displayText = evt.content ?? TOOL_LABELS[tool] ?? tool;
+
+      const existing = phaseMap.get(phase);
+      if (existing && !existing.done) {
+        // In-place update: same phase, just update status
+        existing.status = displayText;
+        existing.subStepCount++;
+      } else {
+        // New phase → new step row
+        const step: StepRow = {
+          id: evt.id,
+          phase,
+          label: displayText,
+          status: displayText,
+          done: false,
+          subStepCount: 1,
+        };
+        steps.push(step);
+        phaseMap.set(phase, step);
+      }
+      continue;
+    }
+
+    if (evt.kind === 'tool_result') {
+      const tool = evt.tool ?? 'unknown';
+      if (!USER_VISIBLE_TOOLS.has(tool)) {
+        continue;
+      }
+      const phase = phaseOf(tool);
+      const match = phaseMap.get(phase);
+      if (match) {
+        match.status = evt.content ?? match.status;
+        // Phase is done when a "summary" result arrives (not intermediate progress)
+        // Mark done if the result's tool matches the phase directly
+        if (tool === phase || match.subStepCount <= 1) {
+          match.result = { text: evt.content ?? '', success: evt.success !== false };
+          match.done = true;
+        }
+      }
+      continue;
+    }
+  }
+
+  return { steps, preStatus };
+}

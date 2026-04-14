@@ -1,48 +1,57 @@
 // @agentic-obs/data-layer - Object model and data access
+//
+// Naming convention:
+//   I*Repository  — abstract persistence interfaces (repository/)
+//   *Store        — in-memory implementations (stores/)
+//   IGateway*     — gateway-facing subset interfaces (stores/)
 
+// ── Domain models (re-exported from common) ──────────────────────────────
 export type { Service, Change, Symptom, Evidence, Investigation, Action } from '@agentic-obs/common';
 
+// ── Subsystems ───────────────────────────────────────────────────────────
 export * from './session/index.js';
 export * from './topology/index.js';
-export * from './semantic-metrics/index.js';
 export * from './db/index.js';
-export * from './repository/index.js';
 export * from './cache/index.js';
 
-// Stores - re-exported selectively to avoid name conflicts with repository types.
+// ── Repository interfaces ────────────────────────────────────────────────
+export * from './repository/index.js';
+
+// ── Store implementations ────────────────────────────────────────────────
+// Re-exported selectively to avoid name conflicts with repository types.
 // For the full store API, import from '@agentic-obs/data-layer/stores'.
 export {
-  // Persistence
+  // Persistence helpers
   type Persistable,
   setMarkDirty,
   markDirty as markStoreDirty,
 
-  // Alert Rule Store
+  // Alert Rule
   AlertRuleStore,
   defaultAlertRuleStore,
 
-  // Approval Store
+  // Approval
   ApprovalStore,
   approvalStore,
   type ApprovalRequest,
   type SubmitApprovalParams,
 
-  // Incident Store
+  // Incident
   IncidentStore,
   incidentStore,
   type CreateIncidentParams,
   type UpdateIncidentParams,
   type CreateIncidentParamsWithTenant,
 
-  // Notification Store
+  // Notification
   NotificationStore,
   defaultNotificationStore,
 
-  // Post Mortem Store
+  // Post Mortem
   PostMortemStore,
   postMortemStore,
 
-  // Feed Store
+  // Feed
   FeedStore,
   feedStore,
   type FeedEventType,
@@ -56,47 +65,46 @@ export {
   type FeedListOptions,
   type FeedbackStats,
 
-  // Investigation Store
+  // Investigation
   InvestigationStore,
   defaultInvestigationStore,
   type FollowUpRecord,
   type FeedbackBody,
   type StoredFeedback,
 
-  // Share Store (ShareLink and SharePermission types intentionally not re-exported
-  // here due to conflicts with repository/types.ts; import from the store interfaces instead)
+  // Share
   ShareStore,
   defaultShareStore,
 
-  // Dashboard Store
+  // Dashboard
   DashboardStore,
   defaultDashboardStore,
 
-  // Conversation Store
+  // Conversation
   ConversationStore,
   defaultConversationStore,
 
-  // Investigation Report Store
+  // Investigation Report
   InvestigationReportStore,
   defaultInvestigationReportStore,
 
   // Alert Rule Provider Adapter
   AlertRuleStoreProvider,
 
-  // Folder Store
+  // Folder
   FolderStore,
   defaultFolderStore,
   type Folder,
 
-  // Workspace Store
+  // Workspace
   WorkspaceStore,
   defaultWorkspaceStore,
 
-  // Version Store
+  // Version
   VersionStore,
   defaultVersionStore,
 
-  // Gateway Interfaces
+  // Gateway interfaces (subset of store APIs consumed by the API gateway)
   type MaybeAsync,
   type IGatewayInvestigationStore,
   type IGatewayIncidentStore,

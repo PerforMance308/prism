@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { ApiError } from '@agentic-obs/common';
-import type { IApprovalRepository } from '@agentic-obs/data-layer';
+import type { IGatewayApprovalStore } from '@agentic-obs/data-layer';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/rbac.js';
 
-export function createApprovalRouter(repo: IApprovalRepository): Router {
+export function createApprovalRouter(repo: IGatewayApprovalStore): Router {
   const router = Router();
 
   // GET /api/approvals - list pending approvals

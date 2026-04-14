@@ -27,11 +27,7 @@ export interface PanelAdderInput {
   goal: string
   existingPanels: PanelConfig[]
   existingVariables: DashboardVariable[]
-  /** @deprecated use datasources instead */
-  availableMetrics: string[]
-  /** @deprecated use datasources instead */
-  labelsByMetric: Record<string, string[]>
-  /** All connected datasources with their discovered metrics */
+  /** Connected datasources with their discovered metrics. Optional — if omitted, the LLM generates without metric context. */
   datasources?: DatasourceContext[]
   gridNextRow: number
 }
@@ -132,15 +128,6 @@ export class PanelAdderAgent {
         return section
       })
       datasourceSection = `\n## Connected Datasources\n${parts.join('\n')}\nDo NOT guess metric names or label values. Use ONLY what is listed above.\n`
-    } else {
-      // Fallback to legacy fields
-      const metricsSection = input.availableMetrics.length
-        ? `\n## Available Metrics\nONLY use metrics from this list:\n${input.availableMetrics.slice(0, 80).join('\n')}\n`
-        : ''
-      const labelsSection = Object.keys(input.labelsByMetric).length
-        ? `\n## Label Dimensions\n${Object.entries(input.labelsByMetric).slice(0, 20).map(([k, v]) => `- ${k}: ${v.join(', ')}`).join('\n')}\n`
-        : ''
-      datasourceSection = metricsSection + labelsSection
     }
 
     const feedbackSection = criticFeedback
@@ -292,11 +279,14 @@ approved = true if overallScore >= 8 AND no severity=error issues.`
         continue
 
       let sourceMetric: string | undefined
-      for (const [metric, labels] of Object.entries(input.labelsByMetric)) {
-        if (labels.includes(varName)) {
-          sourceMetric = metric
-          break
+      for (const ds of input.datasources ?? []) {
+        for (const [metric, labels] of Object.entries(ds.labelsByMetric)) {
+          if (labels.includes(varName)) {
+            sourceMetric = metric
+            break
+          }
         }
+        if (sourceMetric) break
       }
 
       variables.push({

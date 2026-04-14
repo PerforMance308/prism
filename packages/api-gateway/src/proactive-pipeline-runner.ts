@@ -67,7 +67,7 @@ export async function runProactivePipeline(): Promise<void> {
   const correlationEngine = new CorrelationEngine({
     correlationWindowMs: 5 * 60_000,
     checkIntervalMs: 60_000,
-  } as any);
+  });
 
   // -- AlertRuleEvaluator (optional - requires Prometheus datasource)
   const envPrometheusUrl = process.env['PROMETHEUS_URL'];
@@ -90,7 +90,7 @@ export async function runProactivePipeline(): Promise<void> {
     const provider = new AlertRuleStoreProvider(defaultAlertRuleStore);
     alertRuleEvaluator = new AlertRuleEvaluator(promQl, provider, {
       minCycleIntervalMs: 15_000,
-    } as any);
+    });
 
     log.info({ prometheusUrl }, `AlertRuleEvaluator enabled (prometheus: ${prometheusUrl})`);
   }
@@ -101,7 +101,7 @@ export async function runProactivePipeline(): Promise<void> {
   );
 
   // Override finding callbacks to also enqueue for worker processing
-  correlationEngine.onIncident((draft: any) => {
+  correlationEngine.onIncident((draft) => {
     void queue.enqueue('correlate', {
       symptoms: draft.symptoms,
       changes: draft.changes,

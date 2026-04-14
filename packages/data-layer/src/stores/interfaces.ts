@@ -55,7 +55,7 @@ export interface IGatewayInvestigationStore {
     workspaceId?: string
   }): MaybeAsync<Investigation>
   findById(id: string): MaybeAsync<Investigation | undefined>
-  findAll(tenantId?: string): MaybeAsync<Investigation[]>
+  findAll(): MaybeAsync<Investigation[]>
   getArchived(): MaybeAsync<Investigation[]>
   restoreFromArchive(id: string): MaybeAsync<Investigation | undefined>
   addFollowUp(investigationId: string, question: string): MaybeAsync<FollowUpRecord>
@@ -80,7 +80,7 @@ export interface IGatewayInvestigationStore {
 export interface IGatewayIncidentStore {
   create(params: CreateIncidentParamsWithTenant): MaybeAsync<Incident>
   findById(id: string): MaybeAsync<Incident | undefined>
-  findAll(tenantId?: string): MaybeAsync<Incident[]>
+  findAll(): MaybeAsync<Incident[]>
   getArchived(): MaybeAsync<Incident[]>
   restoreFromArchive(id: string): MaybeAsync<Incident | undefined>
   update(id: string, params: UpdateIncidentParams): MaybeAsync<Incident | undefined>

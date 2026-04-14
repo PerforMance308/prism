@@ -1,2 +1,0 @@
-export type { MaybeAsync, IGatewayInvestigationStore, IGatewayIncidentStore, IGatewayFeedStore, IGatewayApprovalStore, IGatewayShareStore, IGatewayDashboardStore, IConversationStore, GatewayStores, } from '@agentic-obs/data-layer';
-//# sourceMappingURL=types.d.ts.map

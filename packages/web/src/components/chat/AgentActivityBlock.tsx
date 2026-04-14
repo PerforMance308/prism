@@ -1,0 +1,158 @@
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { ChatEvent } from '../../hooks/useDashboardChat.js';
+import { buildSteps } from './event-processing.js';
+import type { StepRow } from './event-processing.js';
+
+// Icons
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      className={`w-3.5 h-3.5 text-on-surface-variant transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function AnimatedDots() {
+  return (
+    <span className="inline-flex gap-0.5 ml-0.5 translate-y-[-1px]">
+      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+      <span className="w-1 h-1 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+    </span>
+  );
+}
+
+// Step row component
+
+function StepRowView({
+  step,
+  isActive,
+}: {
+  step: StepRow;
+  isActive: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 py-1.5 min-h-[20px]">
+      <div className="w-4 shrink-0">
+        {isActive ? (
+          <span className="block w-2 h-2 rounded-full bg-primary animate-pulse" />
+        ) : step.result?.success ? (
+          <svg className="w-3.5 h-3.5 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : step.done ? (
+          <svg className="w-3.5 h-3.5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <span className="block w-2 h-2 rounded-full bg-on-surface-variant" />
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-on-surface">{step.label}</span>
+          {isActive && <AnimatedDots />}
+        </div>
+        <div className="text-[11px] text-on-surface-variant truncate mt-0.5 leading-tight">
+          {step.result?.text || step.status}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Collapsible agent activity block
+
+export default function AgentActivityBlock({
+  events,
+  isLive,
+}: {
+  events: ChatEvent[];
+  isLive: boolean;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  // Auto-collapse when no longer live
+  const wasLive = useRef(isLive);
+  useEffect(() => {
+    if (wasLive.current && !isLive) {
+      setExpanded(false);
+    }
+    wasLive.current = isLive;
+  }, [isLive]);
+
+  const { steps, preStatus } = useMemo(() => buildSteps(events), [events]);
+
+  // Summary for collapsed state
+  const doneCount = steps.filter((s) => s.done).length;
+  const failCount = steps.filter((s) => s.result && !s.result.success).length;
+  const lastActive = [...steps].reverse().find((s) => !s.done);
+
+  const summaryText = isLive
+    ? expanded
+      ? `${doneCount} of ${steps.length} steps done`
+      : lastActive
+        ? `${lastActive.label}: ${preStatus ?? 'Working...'}`
+        : `${steps.length} steps`
+    : `${doneCount} steps completed${failCount > 0 ? `, ${failCount} failed` : ''}`;
+
+  return (
+    <div className="my-2">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left py-1 group"
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <ChevronIcon expanded={expanded} />
+          {isLive ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shrink-0" />
+              <span className="text-xs text-on-surface-variant truncate">{summaryText}</span>
+              {!expanded && <AnimatedDots />}
+            </>
+          ) : (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary shrink-0" />
+              <span className="text-xs text-on-surface-variant truncate">{summaryText}</span>
+            </>
+          )}
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="overflow-hidden"
+          >
+            <div className="mt-1 px-3 pb-2 border-l border-outline-variant">
+              {preStatus && steps.length === 0 && (
+                <div className="flex items-center gap-2 py-1.5">
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
+                  <span className="text-xs text-on-surface-variant">{preStatus}</span>
+                  <AnimatedDots />
+                </div>
+              )}
+              {steps.map((step) => {
+                const isActive = isLive && !step.done && step === [...steps].reverse().find((s) => !s.done);
+                return <StepRowView key={step.id} step={step} isActive={isActive} />;
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

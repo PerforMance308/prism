@@ -1,5 +1,6 @@
 // PrometheusAdapter - implements DataAdapter for Prometheus
 
+import { getErrorMessage } from '@agentic-obs/common';
 import type { DataAdapter } from '../adapter.js';
 import type {
   SemanticQuery,
@@ -14,7 +15,7 @@ import { translateToPromQL, getSupportedMetrics } from './translator.js';
 
 export interface PrometheusAdapterOptions {
   config: PrometheusAdapterConfig;
-  /** Inject a custom client (useful for testing with MockPrometheusClient) */
+  /** Inject a custom client (useful for testing) */
   client?: IPrometheusClient;
   /** Adapter instance name, defaults to "prometheus" */
   name?: string;
@@ -126,7 +127,7 @@ export class PrometheusAdapter implements DataAdapter {
     } catch (err) {
       return {
         status: 'unavailable',
-        message: err instanceof Error ? err.message : String(err),
+        message: getErrorMessage(err),
         latencyMs: Date.now() - start,
         checkedAt: new Date().toISOString(),
       };

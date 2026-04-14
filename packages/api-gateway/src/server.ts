@@ -63,7 +63,7 @@ const log = createLogger('api-gateway');
 const DATA_DIR = process.env['DATA_DIR'] || join(process.cwd(), '.uname-data');
 
 function buildSqliteRepositories(): SqliteRepositories {
-  const dbPath = process.env['SQLITE_PATH'] || join(DATA_DIR, 'prism.db');
+  const dbPath = process.env['SQLITE_PATH'] || join(DATA_DIR, 'openobs.db');
   const db = createSqliteClient({ path: dbPath });
   ensureSchema(db);
   return createSqliteRepositories(db);
@@ -135,49 +135,49 @@ export function createApp(): Application {
     const eventAlertRuleStore = new EventEmittingAlertRuleRepository(repos.alertRules);
 
     app.use('/api/investigations', createInvestigationRouter({
-      store: repos.investigations as any,
+      store: repos.investigations,
       feed: eventFeedStore,
-      shareRepo: repos.shares as any,
+      shareRepo: repos.shares,
       reportStore: repos.investigationReports,
     }));
     app.use('/api/feed', createFeedRouter(eventFeedStore));
     app.use('/api/incidents', createIncidentRouter({
-      store: repos.incidents as any,
-      investigationStore: repos.investigations as any,
+      store: repos.incidents,
+      investigationStore: repos.investigations,
       pmStore: repos.postMortems,
     }));
     app.use('/api/shared', createSharedRouter({
-      shareRepo: repos.shares as any,
-      investigationStore: repos.investigations as any,
+      shareRepo: repos.shares,
+      investigationStore: repos.investigations,
     }));
     app.use('/api/meta', createMetaRouter({
-      investigationStore: repos.investigations as any,
+      investigationStore: repos.investigations,
       feedStore: eventFeedStore,
     }));
-    app.use('/api/approvals', createApprovalRouter(eventApprovalStore as any));
+    app.use('/api/approvals', createApprovalRouter(eventApprovalStore));
     app.use('/api/notifications', createNotificationsRouter({
       notificationStore: repos.notifications,
       alertRuleStore: eventAlertRuleStore,
     }));
     app.use('/api/intent', createIntentRouter({
-      dashboardStore: repos.dashboards as any,
+      dashboardStore: repos.dashboards,
       alertRuleStore: eventAlertRuleStore,
-      investigationStore: repos.investigations as any,
+      investigationStore: repos.investigations,
       feedStore: eventFeedStore,
       reportStore: repos.investigationReports,
     }));
     app.use('/api/investigation-reports', createInvestigationReportRouter(repos.investigationReports));
     app.use('/api/dashboards', createDashboardRouter({
-      store: repos.dashboards as any,
-      conversationStore: repos.conversations as any,
+      store: repos.dashboards,
+      conversationStore: repos.conversations,
       investigationReportStore: repos.investigationReports,
       alertRuleStore: eventAlertRuleStore,
-      investigationStore: repos.investigations as any,
-      feedStore: eventFeedStore as any,
+      investigationStore: repos.investigations,
+      feedStore: eventFeedStore,
     }));
     app.use('/api/alert-rules', createAlertRulesRouter({
       alertRuleStore: eventAlertRuleStore,
-      investigationStore: repos.investigations as any,
+      investigationStore: repos.investigations,
       feedStore: eventFeedStore,
       reportStore: repos.investigationReports,
     }));
@@ -187,26 +187,22 @@ export function createApp(): Application {
       alertRuleStore: eventAlertRuleStore,
       folderStore: repos.folders,
     }));
-    app.use('/api/workspaces', createWorkspaceRouter({ store: repos.workspaces as any }));
+    app.use('/api/workspaces', createWorkspaceRouter({ store: repos.workspaces }));
     app.use('/api/versions', createVersionRouter(repos.versions));
     app.use('/api/agent', createAgentRouter({
-      dashboardStore: repos.dashboards as any,
-      conversationStore: repos.conversations as any,
+      dashboardStore: repos.dashboards,
+      conversationStore: repos.conversations,
       investigationReportStore: repos.investigationReports,
       alertRuleStore: eventAlertRuleStore,
-      investigationStore: repos.investigations as any,
+      investigationStore: repos.investigations,
       feedStore: eventFeedStore,
     }));
-
-    // Store repos on app for startServer to access
-    (app as any).__sqliteRepos = repos;
-    (app as any).__eventStores = { feedStore: eventFeedStore, approvalStore: eventApprovalStore, alertRuleStore: eventAlertRuleStore };
   } else {
     // -- Legacy in-memory mode with JSON persistence
     app.use('/api/investigations', createInvestigationRouter({
       store: defaultInvestigationStore,
       feed: feedStore,
-      shareRepo: defaultShareStore as any,
+      shareRepo: defaultShareStore,
       reportStore: defaultInvestigationReportStore,
     }));
     app.use('/api/feed', createFeedRouter(feedStore));
@@ -216,14 +212,14 @@ export function createApp(): Application {
       pmStore: postMortemStore,
     }));
     app.use('/api/shared', createSharedRouter({
-      shareRepo: defaultShareStore as any,
+      shareRepo: defaultShareStore,
       investigationStore: defaultInvestigationStore,
     }));
     app.use('/api/meta', createMetaRouter({
       investigationStore: defaultInvestigationStore,
       feedStore,
     }));
-    app.use('/api/approvals', createApprovalRouter(approvalStore as any));
+    app.use('/api/approvals', createApprovalRouter(approvalStore));
     app.use('/api/notifications', createNotificationsRouter({
       notificationStore: defaultNotificationStore,
       alertRuleStore: defaultAlertRuleStore,

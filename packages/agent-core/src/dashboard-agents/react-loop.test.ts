@@ -23,7 +23,7 @@ describe('ReActLoop', () => {
 
     const result = await loop.runLoop(
       'system prompt',
-      '把p95做成stat',
+      'make p95 a stat panel',
       vi.fn(),
     )
 
@@ -61,7 +61,7 @@ describe('ReActLoop', () => {
 
     const result = await loop.runLoop(
       'system prompt',
-      '还是拆开吧',
+      'actually split them back apart',
       executeAction,
     )
 

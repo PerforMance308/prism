@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { authManager } from '../auth/auth-manager.js';
+import { callbackStore } from '../auth/callback-store.js';
 import { userStore } from '../auth/user-store.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
@@ -50,9 +51,8 @@ export function createAuthRouter(): Router {
     try {
       const meta = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
       const result = await authManager.handleOidcCallback(code, state, meta);
-      res.redirect(
-        `/login/callback?token=${encodeURIComponent(result.tokens.accessToken)}&refresh=${encodeURIComponent(result.tokens.refreshToken)}`,
-      );
+      const session = callbackStore.create(result);
+      res.redirect(`/login/callback?session=${encodeURIComponent(session)}`);
     } catch (err) {
       res.redirect(`/login?error=${encodeURIComponent(err instanceof Error ? err.message : 'auth_failed')}`);
     }
@@ -82,9 +82,8 @@ export function createAuthRouter(): Router {
     try {
       const meta = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
       const result = await authManager.handleOAuthCallback('github', code, state, meta);
-      res.redirect(
-        `/login/callback?token=${encodeURIComponent(result.tokens.accessToken)}&refresh=${encodeURIComponent(result.tokens.refreshToken)}`,
-      );
+      const session = callbackStore.create(result);
+      res.redirect(`/login/callback?session=${encodeURIComponent(session)}`);
     } catch (err) {
       res.redirect(`/login?error=${encodeURIComponent(err instanceof Error ? err.message : 'auth_failed')}`);
     }
@@ -114,9 +113,8 @@ export function createAuthRouter(): Router {
     try {
       const meta = { ipAddress: req.ip, userAgent: req.headers['user-agent'] };
       const result = await authManager.handleOAuthCallback('google', code, state, meta);
-      res.redirect(
-        `/login/callback?token=${encodeURIComponent(result.tokens.accessToken)}&refresh=${encodeURIComponent(result.tokens.refreshToken)}`,
-      );
+      const session = callbackStore.create(result);
+      res.redirect(`/login/callback?session=${encodeURIComponent(session)}`);
     } catch (err) {
       res.redirect(`/login?error=${encodeURIComponent(err instanceof Error ? err.message : 'auth_failed')}`);
     }
@@ -183,6 +181,22 @@ export function createAuthRouter(): Router {
     }
 
     res.json({ tokens });
+  });
+
+  // GET /api/auth/callback-session/:id
+  router.get('/callback-session/:id', (req: Request, res: Response) => {
+    const id = req.params['id'] ?? '';
+    const result = callbackStore.consume(id);
+    if (!result) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Callback session not found or expired' });
+      return;
+    }
+
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({
+      user: sanitizeUser(result.user),
+      tokens: result.tokens,
+    });
   });
 
   // GET /api/auth/saml/metadata - SP metadata XML for IdP registration

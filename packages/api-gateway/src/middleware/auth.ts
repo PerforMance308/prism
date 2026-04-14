@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import type { ApiError } from '@agentic-obs/common'
 import { createLogger } from '@agentic-obs/common'
+import { getJwtSecret } from '../auth/jwt-secret.js'
 import { roleStore } from './rbac.js'
 
 const log = createLogger('auth')
@@ -15,18 +16,17 @@ export interface AuthenticatedRequest extends Request {
   }
 }
 
-const JWT_SECRET: string = (() => {
-  const secret = process.env['JWT_SECRET']
-  if (!secret) throw new Error(
-    '[auth] FATAL: JWT_SECRET environment variable is required. ' +
-    'Set a cryptographically random secret of at least 32 characters.',
-  )
-  return secret
-})()
+const JWT_SECRET = getJwtSecret('auth')
 
 const VALID_API_KEYS = new Set(
   (process.env['API_KEYS'] ?? '').split(',').map((k) => k.trim()).filter(Boolean),
 )
+const DEV_AUTH_BYPASS_ENABLED =
+  process.env['NODE_ENV'] !== 'production' && process.env['DEV_AUTH_BYPASS'] === 'true'
+
+if (DEV_AUTH_BYPASS_ENABLED) {
+  log.warn('DEV_AUTH_BYPASS=true; unauthenticated requests will be allowed in this process')
+}
 
 function resolveRoleInfo(
   req: AuthenticatedRequest,
@@ -45,17 +45,17 @@ function resolveRoleInfo(
       roles = [payloadRole]
     }
     else {
-      // Allow x-user-role header as a dev-time override (non-production only)
-      const isDevEnv = process.env['NODE_ENV'] !== 'production'
-      const headerRole = isDevEnv ? req.headers['x-user-role'] : undefined
+      // Allow x-user-role header as a dev-time override (non-production + DEV_ROLE_OVERRIDE=true only)
+      const roleOverrideEnabled = process.env['NODE_ENV'] !== 'production' && process.env['DEV_ROLE_OVERRIDE'] === 'true'
+      const headerRole = roleOverrideEnabled ? req.headers['x-user-role'] : undefined
       roles = [typeof headerRole === 'string' && headerRole.length > 0 ? headerRole : 'viewer']
     }
   }
   else {
     // API key: default to `operator` (service-to-service calls)
-    // x-user-role override only permitted outside production
-    const isDevEnv = process.env['NODE_ENV'] !== 'production'
-    const headerRole = isDevEnv ? req.headers['x-user-role'] : undefined
+    // x-user-role override only permitted outside production with DEV_ROLE_OVERRIDE=true
+    const roleOverrideEnabled = process.env['NODE_ENV'] !== 'production' && process.env['DEV_ROLE_OVERRIDE'] === 'true'
+    const headerRole = roleOverrideEnabled ? req.headers['x-user-role'] : undefined
     roles = [typeof headerRole === 'string' && headerRole.length > 0 ? headerRole : 'operator']
   }
 
@@ -69,7 +69,8 @@ export function authMiddleware(
   next: NextFunction,
 ): void {
   const authHeader = req.headers['authorization']
-  const apiKey = req.headers['x-api-key']
+  const apiKeyHeader = process.env['API_KEY_HEADER'] ?? 'x-api-key'
+  const apiKey = req.headers[apiKeyHeader]
 
   // API Key auth
   if (typeof apiKey === 'string' && apiKey.length > 0) {
@@ -102,8 +103,8 @@ export function authMiddleware(
     }
   }
 
-  // In development mode, allow unauthenticated requests with default permissions
-  if (process.env['NODE_ENV'] !== 'production') {
+  // Development bypass must be explicitly enabled to avoid accidentally exposing routes.
+  if (DEV_AUTH_BYPASS_ENABLED) {
     const { roles, permissions } = resolveRoleInfo(req)
     req.auth = { sub: 'anonymous-dev', type: 'apikey', roles, permissions }
     next()
@@ -113,5 +114,3 @@ export function authMiddleware(
   const error: ApiError = { code: 'UNAUTHORIZED', message: 'Authentication required' }
   res.status(401).json(error)
 }
-
-

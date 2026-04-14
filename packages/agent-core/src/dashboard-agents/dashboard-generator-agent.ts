@@ -5,6 +5,7 @@ import type {
   GeneratorDeps,
   GenerateInput,
   GenerateOutput,
+  RawPanelSpec,
 } from './types.js'
 import { agentRegistry } from '../runtime/agent-registry.js'
 import { ResearchPhase } from './phases/research-phase.js'
@@ -122,8 +123,23 @@ export class DashboardGeneratorAgent {
         this.deps.metrics,
         this.deps.sendEvent,
       )
+      const rawPanels: RawPanelSpec[] = allPanels.map((p) => ({
+        title: p.title,
+        description: p.description,
+        visualization: p.visualization,
+        queries: p.queries ?? [],
+        row: p.row,
+        col: p.col,
+        width: p.width,
+        height: p.height,
+        unit: p.unit,
+        stackMode: p.stackMode,
+        fillOpacity: p.fillOpacity,
+        decimals: p.decimals,
+        thresholds: p.thresholds,
+      }))
       validated = await validator.validateAndCorrect(
-        allPanels as any,
+        rawPanels,
         discoveryResult?.metrics ?? [],
       )
     } else {

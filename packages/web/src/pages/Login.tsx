@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.js';
+import { api, apiClient } from '../api/client.js';
+import { OpenObsLogo } from '../components/OpenObsLogo.js';
 
 interface Provider {
   id: string;
@@ -45,25 +47,15 @@ export default function Login() {
     if (user) navigate('/', { replace: true });
   }, [user, navigate]);
 
-  // Handle OAuth callback (token in URL params)
+  // Handle OAuth callback via one-time callback session exchange.
   useEffect(() => {
-    const token = searchParams.get('token');
-    const refresh = searchParams.get('refresh');
-    if (token && refresh) {
+    const session = searchParams.get('session');
+    if (session) {
       void (async () => {
         try {
-          const res = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (res.ok) {
-            const data = (await res.json()) as {
-              user: import('../contexts/AuthContext.js').AuthUser;
-            };
-            login({
-              accessToken: token,
-              refreshToken: refresh,
-              expiresIn: 900,
-            }, data.user);
+          const { data, error } = await apiClient.get<LoginResult>(`/auth/callback-session/${encodeURIComponent(session)}`);
+          if (!error && data) {
+            login(data.tokens, data.user);
             navigate('/', { replace: true });
           } else {
             setError('Authentication failed. Please try again.');
@@ -77,9 +69,8 @@ export default function Login() {
 
   // Fetch available auth providers
   useEffect(() => {
-    fetch('/api/auth/providers')
-      .then((r) => r.json())
-      .then((d: { providers: Provider[] }) => setProviders(d.providers))
+    void api.get<{ providers: Provider[] }>('/auth/providers')
+      .then((d) => setProviders(d.providers))
       .catch(() => setProviders([{ id: 'local', name: 'Email & Password', type: 'local' }]));
   }, []);
 
@@ -94,21 +85,11 @@ export default function Login() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/login/local', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as LoginResult;
-        login(data.tokens, data.user);
-        navigate('/', { replace: true });
-      } else {
-        const err = (await res.json()) as { message?: string };
-        setError(err.message ?? 'Login failed');
-      }
-    } catch {
-      setError('Network error. Please check your connection.');
+      const data = await api.post<LoginResult>('/auth/login/local', { email, password });
+      login(data.tokens, data.user);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Network error. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -122,9 +103,9 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600 text-white text-xl mb-4 shadow-lg">
-            AI
+            <OpenObsLogo className="w-9 h-9" />
           </div>
-          <h1 className="text-2xl font-bold text-white">AgenticObs</h1>
+          <h1 className="text-2xl font-bold text-white">OpenObs</h1>
           <p className="text-slate-300 mt-1">AI-native observability platform</p>
         </div>
 

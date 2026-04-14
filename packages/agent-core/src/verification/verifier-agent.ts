@@ -18,8 +18,6 @@ export class VerifierAgent {
       case 'dashboard': {
         return this.dashboardVerifier.verify({
           dashboard: target as Dashboard,
-          prometheusUrl: context?.prometheusUrl,
-          prometheusHeaders: context?.prometheusHeaders,
           metricsAdapter: context?.metricsAdapter,
         });
       }
@@ -27,8 +25,6 @@ export class VerifierAgent {
       case 'investigation_report': {
         return this.investigationVerifier.verify({
           report: target as InvestigationReport,
-          prometheusUrl: context?.prometheusUrl,
-          prometheusHeaders: context?.prometheusHeaders,
           metricsAdapter: context?.metricsAdapter,
         });
       }
@@ -36,8 +32,6 @@ export class VerifierAgent {
       case 'alert_rule': {
         return this.alertRuleVerifier.verify({
           rule: target as AlertRule,
-          prometheusUrl: context?.prometheusUrl,
-          prometheusHeaders: context?.prometheusHeaders,
           metricsAdapter: context?.metricsAdapter,
         });
       }

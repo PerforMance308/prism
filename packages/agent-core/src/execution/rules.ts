@@ -1,13 +1,30 @@
-// LLM-based action classification (replaces hardcoded keyword rules)
+// LLM-based action classification
 
 import type { LLMGateway } from '@agentic-obs/llm-gateway';
-import type { ActionRule } from './types.js';
 import type { Action, Hypothesis, Evidence } from '@agentic-obs/common';
 import { stripCodeFences } from '../utils/llm-parse.js';
 
 let _seq = 0;
 function nextId(): string {
   return `act-${(++_seq).toString(36)}`;
+}
+
+/**
+ * Build a critical-severity notify action for the given hypothesis.
+ * Used when the investigation's impact.severity is 'critical' and the LLM
+ * didn't already recommend a notify action.
+ */
+export function buildCriticalNotifyAction(hypothesis: Hypothesis, entity: string): Action {
+  return {
+    id: nextId(),
+    investigationId: hypothesis.investigationId,
+    type: 'notify',
+    description: `Notify on-call for critical incident affecting ${entity}: ${hypothesis.description}`,
+    policyTag: 'suggest',
+    status: 'proposed',
+    params: { service: entity, hypothesisId: hypothesis.id, severity: 'critical' },
+    risk: 'low',
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -187,46 +204,3 @@ function parseClassificationResponse(
   return actions;
 }
 
-// ---------------------------------------------------------------------------
-// Legacy ActionRule wrappers — kept so the old ExecutionAgent class still works
-// ---------------------------------------------------------------------------
-
-function makeLegacyRule(name: string): ActionRule {
-  return {
-    name,
-    // Legacy matches() always returns false — classification is done by the
-    // LLM via classifyAndRecommendActions(). These stubs exist only so code
-    // that references the named exports still compiles.
-    matches() {
-      return false;
-    },
-    buildAction(hypothesis, _evidence, entity): Action {
-      return {
-        id: nextId(),
-        investigationId: hypothesis.investigationId,
-        type: 'ticket',
-        description: `[legacy-stub] Open ticket for ${entity}: "${hypothesis.description}"`,
-        policyTag: 'suggest',
-        status: 'proposed',
-        params: { service: entity, hypothesisId: hypothesis.id },
-        risk: 'low',
-      };
-    },
-    rationale(hypothesis) {
-      return `Legacy stub rule for hypothesis "${hypothesis.description}". Use classifyAndRecommendActions() for LLM-based classification.`;
-    },
-  };
-}
-
-export const rollbackRule: ActionRule = makeLegacyRule('rollback-on-deploy');
-export const scaleRule: ActionRule = makeLegacyRule('scale-on-saturation');
-export const configReviewRule: ActionRule = makeLegacyRule('review-config-change');
-export const genericTicketRule: ActionRule = makeLegacyRule('ticket-for-investigation');
-export const criticalNotifyRule: ActionRule = makeLegacyRule('notify-on-critical');
-
-export const DEFAULT_RULES: ActionRule[] = [
-  rollbackRule,
-  scaleRule,
-  configReviewRule,
-  genericTicketRule,
-];

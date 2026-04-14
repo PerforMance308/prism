@@ -12,7 +12,7 @@ import type { LlmConfig } from './setup.js';
  * Create the correct LLMProvider based on the user's setup config.
  */
 export function createLlmProvider(cfg: LlmConfig): LLMProvider {
-  const isCorporateGateway = cfg.provider === 'corporate-gateway' || !!cfg.tokenHelperCommand;
+  const isCorporateGateway = cfg.provider === 'corporate-gateway';
 
   switch (cfg.provider) {
     case 'openai':

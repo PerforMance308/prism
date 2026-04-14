@@ -131,6 +131,8 @@ export type DashboardSseEvent =
   | { type: 'variable_added'; variable: DashboardVariable }
   | { type: 'investigation_report'; report: InvestigationReport }
   | { type: 'verification_report'; report: { status: string; targetKind: string; summary: string; issues: Array<{ code: string; severity: string; message: string; artifactKind: string; artifactId?: string }>; checksRun: string[] } }
+  | { type: 'agent_event'; event: { type: string; agentType: string; timestamp: string; metadata?: Record<string, unknown> } }
+  | { type: 'approval_required'; tool: string; args: Record<string, unknown>; displayText: string }
   | { type: 'reply'; content: string }
   | { type: 'done'; messageId: string }
   | { type: 'error'; message: string };

@@ -6,5 +6,6 @@ export * from './logging/index.js';
 export * from './events/index.js';
 export * from './queue/index.js';
 export * from './lifecycle/index.js';
-export * from './errors/llm-unavailable.js';
+export * from './errors/index.js';
 export * from './models/index.js';
+export * from './adapter-types.js';

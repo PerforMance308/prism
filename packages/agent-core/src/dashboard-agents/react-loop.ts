@@ -134,6 +134,10 @@ export class ReActLoop {
       }
 
       observations.push({ action, args: step.args ?? {}, result: observation })
+      // Stop after the first successful action — every action this loop
+      // handles is a single-shot mutation (or investigation), so there's
+      // nothing to gain from asking the LLM for another ReAct step.
+      break
     }
 
     if (lastAction && lastObservation) {

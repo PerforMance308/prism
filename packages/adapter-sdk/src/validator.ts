@@ -2,7 +2,8 @@
 // Provides boilerplate for the ExecutionAdapter interface so adapter authors
 // only need to implement the core logic, not the scaffolding.
 
-import type { ExecutionAdapter } from '@agentic-obs/agent-core';
+import type { ExecutionAdapter } from '@agentic-obs/common';
+import { getErrorMessage } from '@agentic-obs/common';
 import type { AdapterManifest, ManifestValidationResult } from './types.js';
 import type { BaseAdapter } from './base-adapter.js';
 
@@ -79,7 +80,7 @@ export class AdapterValidator {
     try {
       caps = adapter.capabilities();
     } catch (err) {
-      errors.push(`capabilities() threw: ${err instanceof Error ? err.message : String(err)}`);
+      errors.push(`capabilities() threw: ${getErrorMessage(err)}`);
       return { valid: false, errors };
     }
 
@@ -96,7 +97,7 @@ export class AdapterValidator {
       try {
         manifest = asBase.manifest();
       } catch (err) {
-        errors.push(`manifest() threw: ${err instanceof Error ? err.message : String(err)}`);
+        errors.push(`manifest() threw: ${getErrorMessage(err)}`);
         return { valid: false, errors };
       }
 

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DataAdapter } from '@agentic-obs/adapters';
 import type { LLMGateway } from '@agentic-obs/llm-gateway';
-import { createLogger } from '@agentic-obs/common';
+import { createLogger, getErrorMessage } from '@agentic-obs/common';
 import type { InvestigationStep } from '@agentic-obs/common';
 
 const log = createLogger('investigator');
@@ -71,7 +71,7 @@ export class InvestigationAgent implements Agent<InvestigationInput, Investigati
     } catch (err) {
       return {
         success: false,
-        error: `InvestigationAgent failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: `InvestigationAgent failed: ${getErrorMessage(err)}`,
       };
     }
   }
@@ -154,7 +154,7 @@ export class InvestigationAgent implements Agent<InvestigationInput, Investigati
         }
       } catch (err) {
         step.status = 'failed';
-        step.result = { error: err instanceof Error ? err.message : String(err) };
+        step.result = { error: getErrorMessage(err) };
         step.cost = { tokens: 0, queries: 0, latencyMs: Date.now() - stepStartMs };
       }
     }

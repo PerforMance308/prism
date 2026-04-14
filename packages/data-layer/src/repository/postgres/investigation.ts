@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import type { Investigation } from '@agentic-obs/common';
 import type { ExplanationResult } from '@agentic-obs/common';
 import type { DbClient } from '../../db/client.js';
+import { toJsonColumn } from '../json-column.js';
 import { investigations } from '../../db/schema.js';
 import type {
   IInvestigationRepository,
@@ -66,8 +67,8 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
         sessionId: data.sessionId,
         userId: data.userId,
         intent: data.intent,
-        structuredIntent: data.structuredIntent as unknown as Record<string, unknown>,
-        plan: data.plan as unknown as Record<string, unknown>,
+        structuredIntent: toJsonColumn(data.structuredIntent),
+        plan: toJsonColumn(data.plan),
         status: data.status,
         hypotheses: data.hypotheses,
         evidence: data.evidence,
@@ -87,7 +88,7 @@ export class PostgresInvestigationRepository implements IInvestigationRepository
       .update(investigations)
       .set({
         ...(patch.status !== undefined ? { status: patch.status } : {}),
-        ...(patch.plan !== undefined ? { plan: patch.plan as unknown as Record<string, unknown> } : {}),
+        ...(patch.plan !== undefined ? { plan: toJsonColumn(patch.plan) } : {}),
         ...(patch.hypotheses !== undefined ? { hypotheses: patch.hypotheses } : {}),
         ...(patch.evidence !== undefined ? { evidence: patch.evidence } : {}),
         ...(patch.symptoms !== undefined ? { symptoms: patch.symptoms } : {}),

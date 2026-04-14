@@ -72,8 +72,28 @@ export class RedisCacheProvider implements CacheProvider {
 export async function createRedisCacheProvider(
   url: string = process.env['REDIS_URL'] ?? 'redis://localhost:6379',
 ): Promise<RedisCacheProvider> {
-  // Dynamic import keeps ioredis optional at module-load time
-  const { default: Redis } = (await import('ioredis')) as unknown as { default: new (url: string) => RedisClient };
-  const client = new Redis(url);
+  // Dynamic import keeps ioredis optional at module-load time.
+  // ioredis uses CJS `export =`, so the default is the Redis class but
+  // TypeScript cannot express its construct signature through dynamic import.
+  // We validate the constructor at runtime and adapt the instance to our
+  // minimal RedisClient interface below (avoiding a blanket module-level cast).
+  const mod = await import('ioredis');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const RedisCtor = mod.default as any;
+  if (typeof RedisCtor !== 'function') {
+    throw new Error('ioredis module did not export a Redis constructor');
+  }
+  const raw = new RedisCtor(url);
+  const client: RedisClient = {
+    get: (key) => raw.get(key),
+    set: (...args: [string, string, 'EX', number] | [string, string]) =>
+      (args.length === 4
+        ? raw.set(args[0], args[1], 'EX', args[3])
+        : raw.set(args[0], args[1])) as Promise<'OK' | null>,
+    del: (...keys) => raw.del(...keys),
+    exists: (...keys) => raw.exists(...keys),
+    ttl: (key) => raw.ttl(key),
+    quit: () => raw.quit() as Promise<'OK'>,
+  };
   return new RedisCacheProvider(client);
 }

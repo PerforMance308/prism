@@ -75,7 +75,7 @@ export function createDashboardRouter(deps: DashboardRouterDeps): ExpressRouter 
             )
           } catch (err) {
             log.error({ err, dashboardId: dashboard.id }, 'background generation failed')
-            await store.update(dashboard.id, { status: 'failed' } as any)
+            await store.updateStatus(dashboard.id, 'failed')
           }
         })
       }

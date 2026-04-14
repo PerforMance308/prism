@@ -13,7 +13,7 @@ export interface ConfigSchema {
 export interface ConfigSchemaProperty {
   type: 'string' | 'number' | 'boolean' | 'integer';
   description: string;
-  default?: any;
+  default?: string | number | boolean;
   required?: boolean;
   secret?: boolean; // If true, UI should mask this value
 }

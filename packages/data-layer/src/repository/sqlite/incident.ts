@@ -193,4 +193,12 @@ export class SqliteIncidentRepository implements IIncidentRepository {
       .where(and(...conditions));
     return rows.map(rowToIncident);
   }
+
+  getArchived(): Promise<Incident[]> {
+    return this.findArchived();
+  }
+
+  restoreFromArchive(id: string): Promise<Incident | undefined> {
+    return this.restore(id);
+  }
 }

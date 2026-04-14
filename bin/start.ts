@@ -83,7 +83,7 @@ function openBrowser(url: string) {
 async function main() {
   checkNodeVersion();
 
-  log('Starting Agentic platform...');
+  log('Starting OpenObs...');
 
   // Install dependencies if node_modules is missing
   if (!existsSync(join(ROOT, 'node_modules'))) {

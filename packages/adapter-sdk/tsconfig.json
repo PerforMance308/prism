@@ -5,7 +5,7 @@
     "rootDir": "src"
   },
   "references": [
-    { "path": "../agent-core" }
+    { "path": "../common" }
   ],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]

@@ -6,15 +6,12 @@ import jwt from 'jsonwebtoken';
 import { createEventBusFromEnv, EventTypes } from '@agentic-obs/common';
 import type { IEventBus, EventEnvelope } from '@agentic-obs/common';
 import { createLogger } from '@agentic-obs/common';
+import { getJwtSecret } from '../auth/jwt-secret.js';
 import { roleStore } from '../middleware/rbac.js';
 
 const log = createLogger('websocket-gateway');
 
-const JWT_SECRET: string = (() => {
-  const secret = process.env['JWT_SECRET'];
-  if (!secret) throw new Error('[websocket-gateway] FATAL: JWT_SECRET environment variable is required. Set a cryptographically random secret of at least 32 characters.');
-  return secret;
-})();
+const JWT_SECRET = getJwtSecret('websocket-gateway');
 
 const VALID_API_KEYS = new Set(
   (process.env['API_KEYS'] ?? '').split(',').map((k) => k.trim()).filter(Boolean),
@@ -87,12 +84,35 @@ export function authenticateHandshake(handshake: HandshakeData): SocketAuth {
   throw new Error('Authentication required');
 }
 
+// Per-IP WebSocket connection rate limiter: max 10 attempts per minute
+const wsConnAttempts = new Map<string, { count: number; resetAt: number }>();
+
+function checkWsConnectionRate(ip: string): boolean {
+  const now = Date.now();
+  const entry = wsConnAttempts.get(ip);
+  if (!entry || now >= entry.resetAt) {
+    wsConnAttempts.set(ip, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  entry.count++;
+  return entry.count <= 10;
+}
+
 function applyAuthMiddleware(ns: Namespace | SocketServer): void {
   ns.use((socket, next) => {
+    // Rate-limit connection attempts per IP before auth
+    const forwarded = socket.handshake.headers['x-forwarded-for'];
+    const ip = typeof forwarded === 'string'
+      ? forwarded.split(',')[0]?.trim() ?? 'unknown'
+      : socket.handshake.address ?? 'unknown';
+    if (!checkWsConnectionRate(ip)) {
+      next(new Error('Too many connection attempts'));
+      return;
+    }
+
     try {
-      const socketAuth = authenticateHandshake(
-        socket.handshake as unknown as HandshakeData,
-      );
+      const { auth, headers } = socket.handshake;
+      const socketAuth = authenticateHandshake({ auth, headers });
       (socket as AuthenticatedSocket).auth = socketAuth;
       next();
     } catch {

@@ -1,8 +1,12 @@
 import type { DatasourceConfig } from '../routes/setup.js';
+import { ensureSafeUrl } from './url-validator.js';
 
 /** Test connectivity to a datasource by hitting its health / readiness endpoint. */
 export async function testDatasourceConnection(ds: DatasourceConfig): Promise<{ ok: boolean; message: string }> {
   try {
+    // SSRF protection: validate the base URL before making any request
+    await ensureSafeUrl(ds.url);
+
     const headers: Record<string, string> = {};
     if (ds.apiKey) {
       headers['Authorization'] = `Bearer ${ds.apiKey}`;

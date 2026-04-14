@@ -1,6 +1,7 @@
 import { eq, and, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import type { SqliteClient } from '../../db/sqlite-client.js';
+import { toJsonColumn } from '../json-column.js';
 import { approvals } from '../../db/sqlite-schema.js';
 import type { IApprovalRequestRepository } from '../interfaces.js';
 import type { ApprovalAction, ApprovalContext, ApprovalRequest } from '../../stores/approval-store.js';
@@ -40,8 +41,8 @@ export class SqliteApprovalRequestRepository implements IApprovalRequestReposito
       .insert(approvals)
       .values({
         id: randomUUID(),
-        action: params.action as unknown as Record<string, unknown>,
-        context: params.context as unknown as Record<string, unknown>,
+        action: toJsonColumn(params.action),
+        context: toJsonColumn(params.context),
         status: 'pending',
         expiresAt,
         createdAt: now.toISOString(),

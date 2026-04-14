@@ -1,17 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../dashboard-service.js', () => ({
-  DashboardService: vi.fn().mockImplementation(() => ({
+  DashboardService: vi.fn(function MockDashboardService() {
+    return {
     handleChatMessage: vi.fn().mockResolvedValue({
       replyContent: 'Dashboard reply',
       assistantMessageId: 'msg-1',
       navigate: '/investigations/inv-2',
     }),
-  })),
+    };
+  }),
 }));
 
 vi.mock('../intent-service.js', () => ({
-  IntentService: vi.fn().mockImplementation(() => ({
+  IntentService: vi.fn(function MockIntentService() {
+    return {
     processMessage: vi.fn().mockResolvedValue({
       intent: 'dashboard',
       dashboardId: 'dash-2',
@@ -21,7 +24,8 @@ vi.mock('../intent-service.js', () => ({
     executeDashboardIntent: vi.fn(),
     executeAlertIntent: vi.fn(),
     executeInvestigateIntent: vi.fn(),
-  })),
+    };
+  }),
 }));
 
 vi.mock('../../routes/setup.js', () => ({

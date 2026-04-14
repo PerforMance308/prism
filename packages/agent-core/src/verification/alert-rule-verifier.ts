@@ -5,10 +5,6 @@ import { testPrometheusQuery } from './prometheus-tester.js';
 
 export interface AlertRuleVerifierInput {
   rule: AlertRule;
-  /** @deprecated Use metricsAdapter instead */
-  prometheusUrl?: string;
-  /** @deprecated Use metricsAdapter instead */
-  prometheusHeaders?: Record<string, string>;
   metricsAdapter?: IMetricsAdapter;
 }
 
@@ -17,7 +13,7 @@ const VALID_OPERATORS = new Set(['>', '>=', '<', '<=', '==', '!=']);
 
 export class AlertRuleVerifier {
   async verify(input: AlertRuleVerifierInput): Promise<VerificationReport> {
-    const { rule, prometheusUrl, prometheusHeaders, metricsAdapter } = input;
+    const { rule, metricsAdapter } = input;
     const issues: VerificationIssue[] = [];
     const checksRun: string[] = [];
 
@@ -128,18 +124,13 @@ export class AlertRuleVerifier {
     }
 
     // 6. query_executable - test PromQL query against Prometheus
-    const queryTarget = metricsAdapter ?? prometheusUrl;
     if (
-      queryTarget &&
+      metricsAdapter &&
       rule.condition?.query &&
       rule.condition.query.trim().length > 0
     ) {
       checksRun.push('query_executable');
-      const result = await testPrometheusQuery(
-        queryTarget,
-        rule.condition.query,
-        prometheusHeaders,
-      );
+      const result = await testPrometheusQuery(metricsAdapter, rule.condition.query);
       if (result.unreachable) {
         issues.push({
           code: 'query_executable',

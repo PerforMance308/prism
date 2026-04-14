@@ -125,9 +125,6 @@ export function getSystemPrompt(audience: ExplanationAudience): string {
   }
 }
 
-/** @deprecated Use getSystemPrompt('sre') instead. Kept for backwards compatibility. */
-export const EXPLANATION_SYSTEM_PROMPT = SRE_SYSTEM_PROMPT;
-
 export function buildExplanationUserMessage(input: ExplanationInput): string {
   const evidenceByHypothesis: Record<string, unknown[]> = {};
 

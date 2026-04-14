@@ -20,7 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentic-obs/agent-core": "*"
+    "@agentic-obs/common": "*"
   },
   "devDependencies": {
     "typescript": "*",

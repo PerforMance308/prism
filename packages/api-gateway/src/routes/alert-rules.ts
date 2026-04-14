@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import type { AlertRule, AlertSilence, NotificationPolicy } from '@agentic-obs/common';
+import { getErrorMessage } from '@agentic-obs/common';
 import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
 import { defaultAlertRuleStore } from '@agentic-obs/data-layer';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
 import { AlertRuleService } from '../services/alert-rule-service.js';
 import { getWorkspaceId } from '../middleware/workspace-context.js';
 
@@ -13,15 +17,27 @@ export interface AlertRulesRouterDeps {
   reportStore?: IInvestigationReportRepository;
 }
 
+function withPermission(permission: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    requirePermission(permission)(req as AuthenticatedRequest, res, next);
+  };
+}
+
 export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router {
   const store = deps.alertRuleStore ?? defaultAlertRuleStore;
   const router = Router();
   const alertRuleService = new AlertRuleService(store);
+  const requireDashboardRead = withPermission('dashboard:read');
+  const requireDashboardWrite = withPermission('dashboard:write');
+
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req as AuthenticatedRequest, res, next);
+  });
 
   // -- POST /api/alert-rules/generate - NL -> alert rule (no dashboard needed)
   // IMPORTANT: must be before /:id routes
 
-  router.post('/generate', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/generate', requireDashboardWrite, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const body = req.body as { prompt?: string };
       if (!body?.prompt || typeof body.prompt !== 'string' || body.prompt.trim() === '') {
@@ -36,9 +52,10 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
         await store.update(rule.id, { workspaceId, labels: { ...rule.labels, workspaceId } });
       }
       res.status(201).json(rule);
-    } catch (err: any) {
-      if (err?.message?.includes('LLM not configured')) {
-        res.status(503).json({ code: 'LLM_NOT_CONFIGURED', message: err.message });
+    } catch (err: unknown) {
+      const message = getErrorMessage(err);
+      if (message.includes('LLM not configured')) {
+        res.status(503).json({ code: 'LLM_NOT_CONFIGURED', message });
         return;
       }
       next(err);
@@ -47,7 +64,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
 
   // -- Alert Rules CRUD
 
-  router.get('/', async (req: Request, res: Response) => {
+  router.get('/', requireDashboardRead, async (req: Request, res: Response) => {
     const state = req.query['state'] as string | undefined;
     const severity = req.query['severity'] as string | undefined;
     const search = req.query['search'] as string | undefined;
@@ -70,7 +87,93 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     res.json(results);
   });
 
-  router.get('/:id', async (req: Request, res: Response) => {
+  router.get('/silences/all', requireDashboardRead, async (_req: Request, res: Response) => {
+    res.json(await store.findAllSilencesIncludingExpired());
+  });
+
+  router.get('/silences', requireDashboardRead, async (_req: Request, res: Response) => {
+    res.json(await store.findSilences());
+  });
+
+  router.post('/silences', requireDashboardWrite, async (req: Request, res: Response) => {
+    const body = req.body as Partial<AlertSilence>;
+    if (!body?.matchers || !body?.startsAt || !body?.endsAt) {
+      res.status(400).json({ code: 'INVALID_INPUT', message: 'matchers, startsAt, endsAt are required' });
+      return;
+    }
+
+    const silence = await store.createSilence({
+      matchers: body.matchers,
+      startsAt: body.startsAt,
+      endsAt: body.endsAt,
+      comment: body.comment ?? '',
+      createdBy: body.createdBy ?? 'user',
+    } as Omit<AlertSilence, 'id' | 'createdAt'>);
+
+    res.status(201).json(silence);
+  });
+
+  router.put('/silences/:id', requireDashboardWrite, async (req: Request, res: Response) => {
+    const updated = await store.updateSilence(req.params['id'] ?? '', req.body as Partial<AlertSilence>);
+    if (!updated) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Silence not found' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  router.delete('/silences/:id', requireDashboardWrite, async (req: Request, res: Response) => {
+    if (!(await store.deleteSilence(req.params['id'] ?? ''))) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Silence not found' });
+      return;
+    }
+    res.status(204).end();
+  });
+
+  // -- Notification Policies
+
+  router.get('/notification-policies', requireDashboardRead, async (_req: Request, res: Response) => {
+    res.json(await store.findAllPolicies());
+  });
+
+  router.post('/notification-policies', requireDashboardWrite, async (req: Request, res: Response) => {
+    const body = req.body as Partial<NotificationPolicy>;
+    if (!body?.name || !body?.channels) {
+      res.status(400).json({ code: 'INVALID_INPUT', message: 'name and channels are required' });
+      return;
+    }
+
+    const policy = await store.createPolicy({
+      name: body.name,
+      matchers: body.matchers ?? [],
+      channels: body.channels,
+      groupBy: body.groupBy ?? [],
+      groupWaitSec: body.groupWaitSec ?? 30,
+      groupIntervalSec: body.groupIntervalSec ?? 300,
+      repeatIntervalSec: body.repeatIntervalSec ?? 3600,
+    } as Omit<NotificationPolicy, 'id' | 'createdAt' | 'updatedAt'>);
+
+    res.status(201).json(policy);
+  });
+
+  router.put('/notification-policies/:id', requireDashboardWrite, async (req: Request, res: Response) => {
+    const updated = await store.updatePolicy(req.params['id'] ?? '', req.body as Partial<NotificationPolicy>);
+    if (!updated) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Notification policy not found' });
+      return;
+    }
+    res.json(updated);
+  });
+
+  router.delete('/notification-policies/:id', requireDashboardWrite, async (req: Request, res: Response) => {
+    if (!(await store.deletePolicy(req.params['id'] ?? ''))) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Notification policy not found' });
+      return;
+    }
+    res.status(204).end();
+  });
+
+  router.get('/:id', requireDashboardRead, async (req: Request, res: Response) => {
     const rule = await store.findById(req.params['id'] ?? '');
     if (!rule) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Alert rule not found' });
@@ -79,7 +182,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     res.json(rule);
   });
 
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', requireDashboardWrite, async (req: Request, res: Response) => {
     const body = req.body as Partial<AlertRule>;
     if (!body?.name || !body.condition) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'name and condition are required' });
@@ -87,23 +190,25 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     }
 
     const workspaceId = getWorkspaceId(req);
-    const rule = await store.create({
+    type AlertRuleCreateInput = Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt' | 'fireCount' | 'state' | 'stateChangedAt'>;
+    const createInput: AlertRuleCreateInput = {
       name: body.name,
       description: body.description ?? '',
       originalPrompt: body.originalPrompt,
-      condition: body.condition,
+      condition: body.condition!,
       evaluationIntervalSec: body.evaluationIntervalSec ?? 60,
       severity: body.severity ?? 'medium',
       labels: { ...body.labels, workspaceId },
       createdBy: body.createdBy ?? 'user',
       notificationPolicyId: body.notificationPolicyId,
       workspaceId,
-    } as unknown as Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt' | 'fireCount' | 'state' | 'stateChangedAt'>);
+    };
+    const rule = await store.create(createInput);
 
     res.status(201).json(rule);
   });
 
-  router.put('/:id', async (req: Request, res: Response) => {
+  router.put('/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const updated = await store.update(req.params['id'] ?? '', req.body as Partial<AlertRule>);
     if (!updated) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Alert rule not found' });
@@ -112,7 +217,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     res.json(updated);
   });
 
-  router.delete('/:id', async (req: Request, res: Response) => {
+  router.delete('/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     if (!(await store.delete(req.params['id'] ?? ''))) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Alert rule not found' });
       return;
@@ -120,7 +225,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     res.status(204).end();
   });
 
-  router.post('/:id/disable', async (req: Request, res: Response) => {
+  router.post('/:id/disable', requireDashboardWrite, async (req: Request, res: Response) => {
     const rule = await store.update(req.params['id'] ?? '', { state: 'disabled' as const });
     if (!rule) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Alert rule not found' });
@@ -129,7 +234,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     res.json(rule);
   });
 
-  router.post('/:id/enable', async (req: Request, res: Response) => {
+  router.post('/:id/enable', requireDashboardWrite, async (req: Request, res: Response) => {
     const rule = await store.update(req.params['id'] ?? '', { state: 'normal' as const });
     if (!rule) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Alert rule not found' });
@@ -138,12 +243,12 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     res.json(rule);
   });
 
-  router.get('/:id/history', async (req: Request, res: Response) => {
+  router.get('/:id/history', requireDashboardRead, async (req: Request, res: Response) => {
     const limit = parseInt((req.query['limit'] as string | undefined) ?? '50', 10);
     res.json(await store.getHistory(req.params['id'] ?? '', limit));
   });
 
-  router.post('/:id/test', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:id/test', requireDashboardWrite, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rule = await store.findById(req.params['id'] ?? '');
       if (!rule) {
@@ -157,7 +262,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     }
   });
 
-  router.post('/:id/investigate', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/:id/investigate', requireDashboardWrite, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const rule = await store.findById(req.params['id'] ?? '');
       if (!rule) {
@@ -176,7 +281,7 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
         res.status(503).json({ code: 'NOT_CONFIGURED', message: 'Investigation stores not configured' });
         return;
       }
-      const { LiveOrchestratorRunner } = await import('../routes/investigation/live-orchestrator-runner.js');
+      const { LiveOrchestratorRunner } = await import('../services/investigation-runner-service.js');
 
       const question = `Investigate alert "${rule.name}": ${rule.condition.query} ${rule.condition.operator} ${rule.condition.threshold}`;
       const investigation = await deps.investigationStore.create({
@@ -199,94 +304,6 @@ export function createAlertRulesRouter(deps: AlertRulesRouterDeps = {}): Router 
     } catch (err) {
       next(err);
     }
-  });
-
-  // -- Silences
-
-  router.get('/silences/all', async (_req: Request, res: Response) => {
-    res.json(await store.findAllSilencesIncludingExpired());
-  });
-
-  router.get('/silences', async (_req: Request, res: Response) => {
-    res.json(await store.findSilences());
-  });
-
-  router.post('/silences', async (req: Request, res: Response) => {
-    const body = req.body as Partial<AlertSilence>;
-    if (!body?.matchers || !body?.startsAt || !body?.endsAt) {
-      res.status(400).json({ code: 'INVALID_INPUT', message: 'matchers, startsAt, endsAt are required' });
-      return;
-    }
-
-    const silence = await store.createSilence({
-      matchers: body.matchers,
-      startsAt: body.startsAt,
-      endsAt: body.endsAt,
-      comment: body.comment ?? '',
-      createdBy: body.createdBy ?? 'user',
-    } as Omit<AlertSilence, 'id' | 'createdAt'>);
-
-    res.status(201).json(silence);
-  });
-
-  router.put('/silences/:id', async (req: Request, res: Response) => {
-    const updated = await store.updateSilence(req.params['id'] ?? '', req.body as Partial<AlertSilence>);
-    if (!updated) {
-      res.status(404).json({ code: 'NOT_FOUND', message: 'Silence not found' });
-      return;
-    }
-    res.json(updated);
-  });
-
-  router.delete('/silences/:id', async (req: Request, res: Response) => {
-    if (!(await store.deleteSilence(req.params['id'] ?? ''))) {
-      res.status(404).json({ code: 'NOT_FOUND', message: 'Silence not found' });
-      return;
-    }
-    res.status(204).end();
-  });
-
-  // -- Notification Policies
-
-  router.get('/notification-policies', async (_req: Request, res: Response) => {
-    res.json(await store.findAllPolicies());
-  });
-
-  router.post('/notification-policies', async (req: Request, res: Response) => {
-    const body = req.body as Partial<NotificationPolicy>;
-    if (!body?.name || !body?.channels) {
-      res.status(400).json({ code: 'INVALID_INPUT', message: 'name and channels are required' });
-      return;
-    }
-
-    const policy = await store.createPolicy({
-      name: body.name,
-      matchers: body.matchers ?? [],
-      channels: body.channels,
-      groupBy: body.groupBy ?? [],
-      groupWaitSec: body.groupWaitSec ?? 30,
-      groupIntervalSec: body.groupIntervalSec ?? 300,
-      repeatIntervalSec: body.repeatIntervalSec ?? 3600,
-    } as Omit<NotificationPolicy, 'id' | 'createdAt' | 'updatedAt'>);
-
-    res.status(201).json(policy);
-  });
-
-  router.put('/notification-policies/:id', async (req: Request, res: Response) => {
-    const updated = await store.updatePolicy(req.params['id'] ?? '', req.body as Partial<NotificationPolicy>);
-    if (!updated) {
-      res.status(404).json({ code: 'NOT_FOUND', message: 'Notification policy not found' });
-      return;
-    }
-    res.json(updated);
-  });
-
-  router.delete('/notification-policies/:id', async (req: Request, res: Response) => {
-    if (!(await store.deletePolicy(req.params['id'] ?? ''))) {
-      res.status(404).json({ code: 'NOT_FOUND', message: 'Notification policy not found' });
-      return;
-    }
-    res.status(204).end();
   });
 
   return router;

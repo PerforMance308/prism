@@ -20,13 +20,14 @@ import type {
   IInvestigationReportRepository,
   IPostMortemRepository,
 } from './interfaces.js';
-
-import { InMemoryInvestigationRepository } from './memory/investigation.js';
-import { InMemoryIncidentRepository } from './memory/incident.js';
-import { InMemoryFeedRepository } from './memory/feed.js';
-import { InMemoryCaseRepository } from './memory/case.js';
-import { InMemoryApprovalRepository } from './memory/approval.js';
-import { InMemoryShareRepository } from './memory/share.js';
+import type {
+  IGatewayInvestigationStore,
+  IGatewayIncidentStore,
+  IGatewayApprovalStore,
+  IGatewayShareStore,
+  IGatewayDashboardStore,
+  IConversationStore,
+} from '../stores/interfaces.js';
 
 import { PostgresInvestigationRepository } from './postgres/investigation.js';
 import { PostgresIncidentRepository } from './postgres/incident.js';
@@ -65,15 +66,20 @@ export interface Repositories {
 /**
  * Extended repositories available with the SQLite backend.
  * Includes all entity types that were previously only available via in-memory stores.
+ *
+ * Investigation/incident/approval/share/dashboard/conversation repositories are
+ * typed as intersections of the repository interface and the gateway store
+ * interface — the SQLite classes implement both shapes so router factories that
+ * only want the gateway surface can consume them directly without casts.
  */
 export interface SqliteRepositories {
-  investigations: IInvestigationRepository;
-  incidents: IIncidentRepository;
+  investigations: IInvestigationRepository & IGatewayInvestigationStore;
+  incidents: IIncidentRepository & IGatewayIncidentStore;
   feedItems: IFeedItemRepository;
-  approvals: IApprovalRequestRepository;
-  shares: IShareLinkRepository;
-  dashboards: IDashboardRepository;
-  conversations: IConversationRepository;
+  approvals: IApprovalRequestRepository & IGatewayApprovalStore;
+  shares: IShareLinkRepository & IGatewayShareStore;
+  dashboards: IDashboardRepository & IGatewayDashboardStore;
+  conversations: IConversationRepository & IConversationStore;
   folders: IFolderRepository;
   alertRules: IAlertRuleRepository;
   notifications: INotificationRepository;
@@ -81,17 +87,6 @@ export interface SqliteRepositories {
   workspaces: IWorkspaceRepository;
   investigationReports: IInvestigationReportRepository;
   postMortems: IPostMortemRepository;
-}
-
-export function createInMemoryRepositories(): Repositories {
-  return {
-    investigations: new InMemoryInvestigationRepository(),
-    incidents: new InMemoryIncidentRepository(),
-    feed: new InMemoryFeedRepository(),
-    cases: new InMemoryCaseRepository(),
-    approvals: new InMemoryApprovalRepository(),
-    shares: new InMemoryShareRepository(),
-  };
 }
 
 export function createPostgresRepositories(db: DbClient): Repositories {
@@ -124,15 +119,12 @@ export function createSqliteRepositories(db: SqliteClient): SqliteRepositories {
   };
 }
 
-export type RepositoryBackend = 'memory' | 'postgres' | 'sqlite';
+export type RepositoryBackend = 'postgres' | 'sqlite';
 
 export function createRepositories(
   backend: RepositoryBackend,
-  db?: DbClient,
+  db: DbClient,
 ): Repositories {
-  if (backend === 'postgres') {
-    if (!db) throw new Error('DbClient is required for postgres backend');
-    return createPostgresRepositories(db);
-  }
-  return createInMemoryRepositories();
+  if (!db) throw new Error('DbClient is required');
+  return createPostgresRepositories(db);
 }

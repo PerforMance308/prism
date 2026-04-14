@@ -7,6 +7,9 @@ import type {
   IInvestigationReportRepository,
 } from '@agentic-obs/data-layer';
 import type { IGatewayDashboardStore, IConversationStore } from '../repositories/types.js';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { hasPermission } from '../middleware/rbac.js';
 import { AgentChatService, type AgentChatContext } from '../services/agent-chat-service.js';
 
 export interface AgentRouterDeps {
@@ -29,6 +32,10 @@ export function createAgentRouter(deps: AgentRouterDeps): Router {
     feedStore: deps.feedStore,
   });
 
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req as AuthenticatedRequest, res, next);
+  });
+
   router.post('/chat', async (req: Request, res: Response, _next: NextFunction) => {
     const body = req.body as {
       message?: string;
@@ -42,6 +49,22 @@ export function createAgentRouter(deps: AgentRouterDeps): Router {
     }
     if (!body.context || typeof body.context !== 'object' || typeof body.context.kind !== 'string') {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'context is required' });
+      return;
+    }
+
+    const permissions = (req as AuthenticatedRequest).auth?.permissions ?? [];
+    const requiredPermission = (
+      body.context.kind === 'investigation'
+        ? 'investigation:read'
+        : body.context.kind === 'dashboard'
+          ? 'dashboard:write'
+          : 'dashboard:write'
+    );
+    if (!hasPermission(permissions, requiredPermission)) {
+      res.status(403).json({
+        code: 'FORBIDDEN',
+        message: `Insufficient permissions: requires ${requiredPermission}`,
+      });
       return;
     }
 

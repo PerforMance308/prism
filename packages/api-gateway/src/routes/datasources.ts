@@ -4,23 +4,42 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
 import { getSetupConfig, updateDatasources } from './setup.js';
 import type { DatasourceConfig } from './setup.js';
 import { testDatasourceConnection } from '../utils/datasource.js';
+
+// -- Credential masking helper
+
+/** Replace credential values with '••••••' + last 4 chars (or just '••••••' if too short). */
+function maskValue(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  if (value.length <= 4) return '••••••';
+  return '••••••' + value.slice(-4);
+}
+
+function maskDatasource(ds: DatasourceConfig): DatasourceConfig {
+  return {
+    ...ds,
+    ...(ds.apiKey !== undefined && { apiKey: maskValue(ds.apiKey) }),
+    ...(ds.password !== undefined && { password: maskValue(ds.password) }),
+    ...(ds.username !== undefined && { username: maskValue(ds.username) }),
+  };
+}
 
 // -- Router
 
 export const datasourcesRouter = Router();
 
 // GET /api/datasources - list all
-datasourcesRouter.get('/', authMiddleware, (_req: Request, res: Response) => {
+datasourcesRouter.get('/', authMiddleware, requirePermission('dashboard:read'), (_req: Request, res: Response) => {
   const config = getSetupConfig();
-  res.json({ datasources: config.datasources });
+  res.json({ datasources: config.datasources.map(maskDatasource) });
 });
 
 // POST /api/datasources/test - test connection without saving
 // Registered BEFORE /:id route so the literal path "test" is not consumed by /:id.
-datasourcesRouter.post('/test', authMiddleware, async (req: Request, res: Response) => {
+datasourcesRouter.post('/test', authMiddleware, requirePermission('dashboard:write'), async (req: Request, res: Response) => {
   const body = req.body as Partial<DatasourceConfig>;
   if (!body?.type || !body.url) {
     res.status(400).json({ error: { code: 'VALIDATION', message: 'type and url are required' } });
@@ -33,7 +52,7 @@ datasourcesRouter.post('/test', authMiddleware, async (req: Request, res: Respon
 });
 
 // POST /api/datasources - create
-datasourcesRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
+datasourcesRouter.post('/', authMiddleware, requirePermission('dashboard:write'), async (req: Request, res: Response) => {
   const body = req.body as Partial<DatasourceConfig>;
   if (!body?.type || !body.url || !body.name) {
     res.status(400).json({ error: { code: 'VALIDATION', message: 'type, name, and url are required' } });
@@ -49,11 +68,11 @@ datasourcesRouter.post('/', authMiddleware, async (req: Request, res: Response) 
 
   const datasources = [...config.datasources, ds];
   await updateDatasources(datasources);
-  res.status(201).json({ datasource: ds });
+  res.status(201).json({ datasource: maskDatasource(ds) });
 });
 
 // GET /api/datasources/:id - get one
-datasourcesRouter.get('/:id', authMiddleware, (req: Request, res: Response) => {
+datasourcesRouter.get('/:id', authMiddleware, requirePermission('dashboard:read'), (req: Request, res: Response) => {
   const id = req.params['id'] ?? '';
   const config = getSetupConfig();
   const ds = config.datasources.find((d) => d.id === id);
@@ -61,11 +80,11 @@ datasourcesRouter.get('/:id', authMiddleware, (req: Request, res: Response) => {
     res.status(404).json({ error: { code: 'NOT_FOUND', message: `Datasource "${id}" not found` } });
     return;
   }
-  res.json({ datasource: ds });
+  res.json({ datasource: maskDatasource(ds) });
 });
 
 // PUT /api/datasources/:id - update
-datasourcesRouter.put('/:id', authMiddleware, async (req: Request, res: Response) => {
+datasourcesRouter.put('/:id', authMiddleware, requirePermission('dashboard:write'), async (req: Request, res: Response) => {
   const id = req.params['id'] ?? '';
   const config = getSetupConfig();
   const idx = config.datasources.findIndex((d) => d.id === id);
@@ -78,11 +97,11 @@ datasourcesRouter.put('/:id', authMiddleware, async (req: Request, res: Response
   const datasources = [...config.datasources];
   datasources[idx] = updated;
   await updateDatasources(datasources);
-  res.json({ datasource: updated });
+  res.json({ datasource: maskDatasource(updated) });
 });
 
 // DELETE /api/datasources/:id - delete
-datasourcesRouter.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+datasourcesRouter.delete('/:id', authMiddleware, requirePermission('dashboard:write'), async (req: Request, res: Response) => {
   const id = req.params['id'] ?? '';
   const config = getSetupConfig();
   const exists = config.datasources.find((d) => d.id === id);
@@ -96,7 +115,7 @@ datasourcesRouter.delete('/:id', authMiddleware, async (req: Request, res: Respo
 });
 
 // POST /api/datasources/:id/test - test a saved datasource by id
-datasourcesRouter.post('/:id/test', authMiddleware, async (req: Request, res: Response) => {
+datasourcesRouter.post('/:id/test', authMiddleware, requirePermission('dashboard:write'), async (req: Request, res: Response) => {
   const id = req.params['id'] ?? '';
   const config = getSetupConfig();
   const ds = config.datasources.find((d) => d.id === id);

@@ -8,6 +8,7 @@ import type {
   TimeInterval,
 } from '@agentic-obs/common';
 import type { SqliteClient } from '../../db/sqlite-client.js';
+import { toJsonColumn } from '../json-column.js';
 import {
   contactPoints,
   notificationPolicyTree,
@@ -130,12 +131,12 @@ export class SqliteNotificationRepository implements INotificationRepository {
     if (existing.length > 0) {
       await this.db
         .update(notificationPolicyTree)
-        .set({ tree: updatedTree as unknown as Record<string, unknown>, updatedAt: now })
+        .set({ tree: toJsonColumn(updatedTree), updatedAt: now })
         .where(eq(notificationPolicyTree.id, 'root'));
     } else {
       await this.db
         .insert(notificationPolicyTree)
-        .values({ id: 'root', tree: updatedTree as unknown as Record<string, unknown>, updatedAt: now });
+        .values({ id: 'root', tree: toJsonColumn(updatedTree), updatedAt: now });
     }
   }
 

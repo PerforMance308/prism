@@ -1,5 +1,6 @@
 // AdapterRegistry - register, discover, and health-check data adapters
 
+import { getErrorMessage } from '@agentic-obs/common';
 import type { DataAdapter } from './adapter.js';
 import type { AdapterHealth, SignalType } from './types.js';
 
@@ -71,7 +72,7 @@ export class AdapterRegistry {
         } catch (err) {
           const health: AdapterHealth = {
             status: 'unavailable',
-            message: err instanceof Error ? err.message : String(err),
+            message: getErrorMessage(err),
             checkedAt: new Date().toISOString(),
           };
           registration.lastHealth = health;

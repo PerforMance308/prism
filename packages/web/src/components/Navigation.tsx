@@ -1,27 +1,9 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.js';
+import { OpenObsLogo } from './OpenObsLogo.js';
 
 /* ───── Icon components ───── */
-
-/* Prism logo — a triangular prism / light refraction motif */
-function PrismLogo({ className }: { className?: string }) {
-  return (
-    <svg className={className ?? 'w-6 h-6'} viewBox="0 0 24 24" fill="none">
-      <path d="M12 2L2 20h20L12 2z" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" />
-      <path d="M12 2L18 20" stroke="url(#prism-grad)" strokeWidth={1.4} strokeLinecap="round" opacity={0.7} />
-      <path d="M8 13l10 7" stroke="url(#prism-grad2)" strokeWidth={1.2} strokeLinecap="round" opacity={0.5} />
-      <defs>
-        <linearGradient id="prism-grad" x1="12" y1="2" x2="18" y2="20">
-          <stop stopColor="#818cf8" /><stop offset="1" stopColor="#c084fc" />
-        </linearGradient>
-        <linearGradient id="prism-grad2" x1="8" y1="13" x2="18" y2="20">
-          <stop stopColor="#60a5fa" /><stop offset="1" stopColor="#34d399" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
 
 /* Home — pulse/activity overview */
 function HomeIcon({ className }: { className?: string }) {
@@ -141,9 +123,9 @@ export default function Navigation() {
         {expanded ? (
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary shrink-0">
-              <PrismLogo />
+              <OpenObsLogo className="w-6 h-6" />
             </div>
-            <span className="text-sm font-bold text-on-surface truncate">Prism</span>
+            <span className="text-sm font-bold text-on-surface truncate">OpenObs</span>
           </div>
         ) : (
           <button
@@ -154,7 +136,7 @@ export default function Navigation() {
           >
             <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary shrink-0 group-hover:bg-surface-high transition-colors">
               <span className="transition-opacity duration-150 group-hover:opacity-0">
-                <PrismLogo />
+                <OpenObsLogo className="w-6 h-6" />
               </span>
               <span className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 text-on-surface">
                 <SidebarToggleIcon expanded={false} />

@@ -37,7 +37,8 @@ export class AlertRuleService {
     const result = await agent.generate(prompt);
     const generated = result.rule;
 
-    const rule = await this.store.create({
+    type AlertRuleCreateInput = Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt' | 'fireCount' | 'state' | 'stateChangedAt'>;
+    const createInput: AlertRuleCreateInput = {
       name: generated.name,
       description: generated.description,
       originalPrompt: prompt,
@@ -47,8 +48,8 @@ export class AlertRuleService {
       labels: generated.labels,
       createdBy: 'llm',
       notificationPolicyId: undefined,
-      autoInvestigate: generated.autoInvestigate,
-    } as unknown as Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt' | 'fireCount' | 'state' | 'stateChangedAt'>);
+    };
+    const rule = await this.store.create(createInput);
 
     return { rule };
   }

@@ -124,7 +124,7 @@ export class IntentService {
       severity: generated.severity,
       labels: generated.labels,
       createdBy: 'llm',
-    } as any);
+    } as Omit<AlertRule, 'id' | 'createdAt' | 'updatedAt' | 'fireCount' | 'state' | 'stateChangedAt'>);
 
     return {
       intent: 'alert',
@@ -155,7 +155,7 @@ export class IntentService {
     if (!this.investigationStore || !this.feedStoreInstance) {
       throw new Error('investigationStore and feedStore are required for investigate intent');
     }
-    const { LiveOrchestratorRunner } = await import('../routes/investigation/live-orchestrator-runner.js');
+    const { LiveOrchestratorRunner } = await import('./investigation-runner-service.js');
 
     const investigation = await this.investigationStore.create({
       question: message,

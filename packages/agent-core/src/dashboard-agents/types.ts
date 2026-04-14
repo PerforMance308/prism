@@ -143,6 +143,7 @@ export interface IAlertRuleStore {
   update?(id: string, patch: Record<string, unknown>): unknown
   findAll?(): { id: string, name: string, severity: string, condition: { query: string, operator: string, threshold: number, forDurationSec: number } }[] | Promise<{ id: string, name: string, severity: string, condition: { query: string, operator: string, threshold: number, forDurationSec: number } }[]>
   findById?(id: string): unknown
+  delete?(id: string): unknown
 }
 
 /** Minimal datasource descriptor passed to the orchestrator. */

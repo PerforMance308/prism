@@ -1,10 +1,15 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { promises as fs } from 'fs';
-import { execSync } from 'child_process';
 import { homedir } from 'os';
 import { join } from 'path';
 import { createLogger, DEFAULT_LLM_MODEL } from '@agentic-obs/common';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
+import { userStore } from '../auth/user-store.js';
+import { ensureSafeUrl } from '../utils/url-validator.js';
+import { createRateLimiter } from '../middleware/rate-limiter.js';
 
 const log = createLogger('setup');
 import {
@@ -25,8 +30,6 @@ export interface LlmConfig {
   region?: string; // For AWS Bedrock
   /** Auth type: "api-key" (default) or "bearer" (for corporate gateways with Okta/SSO) */
   authType?: 'api-key' | 'bearer';
-  /** Shell command to obtain a token (e.g. ./scripts/token.sh). Token is cached and refreshed automatically. */
-  tokenHelperCommand?: string;
 }
 
 export interface DatasourceConfig {
@@ -67,10 +70,29 @@ let inMemoryConfig: SetupConfig = {
   datasources: [],
 };
 
+function normalizeLlmConfig(config?: LlmConfig | null): LlmConfig | undefined {
+  if (!config) return undefined;
+  return {
+    provider: config.provider,
+    apiKey: config.apiKey,
+    model: config.model,
+    baseUrl: config.baseUrl,
+    region: config.region,
+    authType: config.authType,
+  };
+}
+
+function normalizeSetupConfig(config: SetupConfig): SetupConfig {
+  return {
+    ...config,
+    llm: normalizeLlmConfig(config.llm),
+  };
+}
+
 async function loadConfig(): Promise<SetupConfig> {
   try {
     const raw = await fs.readFile(CONFIG_FILE, 'utf-8');
-    return JSON.parse(raw) as SetupConfig;
+    return normalizeSetupConfig(JSON.parse(raw) as SetupConfig);
   } catch (err) {
     log.debug({ err }, 'failed to load config file, using in-memory config');
     return inMemoryConfig;
@@ -78,10 +100,10 @@ async function loadConfig(): Promise<SetupConfig> {
 }
 
 async function saveConfig(config: SetupConfig): Promise<void> {
-  inMemoryConfig = config;
+  inMemoryConfig = normalizeSetupConfig(config);
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true });
-    await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+    await fs.writeFile(CONFIG_FILE, JSON.stringify(inMemoryConfig, null, 2), 'utf-8');
   } catch (err) {
     log.debug({ err }, 'failed to persist config file (best-effort)');
   }
@@ -90,24 +112,20 @@ async function saveConfig(config: SetupConfig): Promise<void> {
 // -- LLM Connectivity Test
 
 function resolveToken(cfg: LlmConfig): string | null {
-  if (cfg.tokenHelperCommand) {
-    try {
-      return execSync(cfg.tokenHelperCommand, { timeout: 10_000, encoding: 'utf-8' }).trim();
-    } catch {
-      return null;
-    }
-  }
-
   return cfg.apiKey ?? null;
 }
 
 async function testLlmConnection(cfg: LlmConfig): Promise<{ ok: boolean; message: string }> {
   try {
-    // Corporate gateway: use token helper + bearer auth + custom base URL
-    if (cfg.provider === 'corporate-gateway' || cfg.tokenHelperCommand) {
+    // SSRF protection: validate baseUrl if provided
+    if (cfg.baseUrl) {
+      await ensureSafeUrl(cfg.baseUrl);
+    }
+
+    if (cfg.provider === 'corporate-gateway') {
       const token = resolveToken(cfg);
       if (!token)
-        return { ok: false, message: cfg.tokenHelperCommand ? 'Token helper command failed' : 'API key is required' };
+        return { ok: false, message: 'Bearer token or API key is required' };
       const baseUrl = cfg.baseUrl;
       if (!baseUrl)
         return { ok: false, message: 'Gateway base URL is required' };
@@ -265,33 +283,42 @@ export function ensureConfigLoaded(): Promise<void> {
   return configLoadPromise;
 }
 
+function allowBootstrapSetup(): boolean {
+  // Allow unauthenticated setup access when there is no way to authenticate:
+  // either the system was never configured, or there are no users in the
+  // in-memory store (users are lost on server restart).
+  return !inMemoryConfig.configured || userStore.count() === 0;
+}
+
+function requireSetupAccess(req: Request, res: Response, next: NextFunction): void {
+  if (allowBootstrapSetup()) {
+    next();
+    return;
+  }
+
+  authMiddleware(req as AuthenticatedRequest, res, () => {
+    requirePermission('*:*')(req as AuthenticatedRequest, res, next);
+  });
+}
+
+// -- Rate limiter for setup endpoints (strict: 5 req/min per IP)
+
+const setupRateLimiter = createRateLimiter({
+  windowMs: 60_000, // 1 minute
+  max: 20,
+});
+
 // -- Router
 
 export function createSetupRouter(): Router {
   const router = Router();
 
+  // Apply strict rate limiting before any setup route (including bootstrap)
+  router.use(setupRateLimiter);
+
   // Load persisted config on startup
   void ensureConfigLoaded().catch((err) => {
     log.error({ err }, 'failed to load config');
-  });
-
-  // GET /api/setup/config — returns current config (API keys masked)
-  router.get('/config', (_req: Request, res: Response) => {
-    const cfg = { ...inMemoryConfig };
-    // Mask sensitive fields
-    if (cfg.llm) {
-      cfg.llm = {
-        ...cfg.llm,
-        apiKey: cfg.llm.apiKey ? '••••••' + cfg.llm.apiKey.slice(-4) : undefined,
-        tokenHelperCommand: cfg.llm.tokenHelperCommand,
-      };
-    }
-    cfg.datasources = cfg.datasources.map((ds) => ({
-      ...ds,
-      apiKey: ds.apiKey ? '••••••' + ds.apiKey.slice(-4) : undefined,
-      password: ds.password ? '••••••' : undefined,
-    }));
-    res.json(cfg);
   });
 
   // GET /api/setup/status
@@ -308,6 +335,26 @@ export function createSetupRouter(): Router {
     });
   });
 
+  router.use(requireSetupAccess);
+
+  // GET /api/setup/config — returns current config (API keys masked)
+  router.get('/config', (_req: Request, res: Response) => {
+    const cfg = { ...inMemoryConfig };
+    // Mask sensitive fields
+    if (cfg.llm) {
+      cfg.llm = {
+        ...cfg.llm,
+        apiKey: cfg.llm.apiKey ? '••••••' + cfg.llm.apiKey.slice(-4) : undefined,
+      };
+    }
+    cfg.datasources = cfg.datasources.map((ds) => ({
+      ...ds,
+      apiKey: ds.apiKey ? '••••••' + ds.apiKey.slice(-4) : undefined,
+      password: ds.password ? '••••••' : undefined,
+    }));
+    res.json(cfg);
+  });
+
   // POST /api/setup/llm
   router.post('/llm', async (req: Request, res: Response) => {
     const body = req.body as { config: LlmConfig; test?: boolean };
@@ -315,6 +362,11 @@ export function createSetupRouter(): Router {
 
     if (!cfg?.provider || !cfg?.model) {
       res.status(400).json({ error: { code: 'VALIDATION', message: 'provider and model are required' } });
+      return;
+    }
+
+    if (!cfg.apiKey && cfg.provider !== 'ollama' && cfg.provider !== 'aws-bedrock') {
+      res.status(400).json({ error: { code: 'VALIDATION', message: 'apiKey is required for this provider' } });
       return;
     }
 
@@ -328,7 +380,7 @@ export function createSetupRouter(): Router {
       return;
     }
 
-    inMemoryConfig = { ...inMemoryConfig, llm: cfg };
+    inMemoryConfig = { ...inMemoryConfig, llm: normalizeLlmConfig(cfg) };
     await saveConfig(inMemoryConfig);
     res.json({ ok: true });
   });
@@ -336,6 +388,10 @@ export function createSetupRouter(): Router {
   // POST /api/setup/llm/test
   router.post('/llm/test', async (req: Request, res: Response) => {
     const cfg = req.body as LlmConfig;
+    if (!cfg?.provider || !cfg?.model) {
+      res.status(400).json({ error: { code: 'VALIDATION', message: 'provider and model are required' } });
+      return;
+    }
     const result = await testLlmConnection(cfg);
     res.status(result.ok ? 200 : 400).json(result);
   });

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
+import { requirePermission } from '../middleware/rbac.js'
 import type { IFolderRepository } from '@agentic-obs/data-layer'
 import { defaultFolderStore } from '@agentic-obs/data-layer'
 
@@ -9,12 +10,12 @@ export function createFolderRouter(store: IFolderRepository = defaultFolderStore
   router.use(authMiddleware)
 
   // GET /api/folders — list all folders
-  router.get('/', async (_req: Request, res: Response) => {
+  router.get('/', requirePermission('dashboard:read'), async (_req: Request, res: Response) => {
     res.json(await store.findAll())
   })
 
   // POST /api/folders — create a folder
-  router.post('/', async (req: Request, res: Response) => {
+  router.post('/', requirePermission('dashboard:write'), async (req: Request, res: Response) => {
     const { name, parentId } = req.body as { name?: string; parentId?: string }
     if (!name || !name.trim()) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'name is required' })
@@ -25,7 +26,7 @@ export function createFolderRouter(store: IFolderRepository = defaultFolderStore
   })
 
   // PUT /api/folders/:id — rename a folder
-  router.put('/:id', async (req: Request, res: Response) => {
+  router.put('/:id', requirePermission('dashboard:write'), async (req: Request, res: Response) => {
     const { name } = req.body as { name?: string }
     if (!name || !name.trim()) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'name is required' })
@@ -40,7 +41,7 @@ export function createFolderRouter(store: IFolderRepository = defaultFolderStore
   })
 
   // DELETE /api/folders/:id — delete a folder and all children
-  router.delete('/:id', async (req: Request, res: Response) => {
+  router.delete('/:id', requirePermission('dashboard:write'), async (req: Request, res: Response) => {
     const deleted = await store.delete(req.params['id'] ?? '')
     if (!deleted) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Folder not found' })

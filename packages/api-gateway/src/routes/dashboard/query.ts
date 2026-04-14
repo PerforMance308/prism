@@ -3,6 +3,7 @@
 
 import { Router } from 'express'
 import type { Request, Response } from 'express'
+import { getErrorMessage } from '@agentic-obs/common'
 import { authMiddleware } from '../../middleware/auth.js'
 import { PrometheusHttpClient } from '@agentic-obs/adapters'
 import { getSetupConfig } from '../setup.js'
@@ -99,7 +100,7 @@ export function createQueryRouter(): Router {
     }
     catch (err) {
       res.status(502).json({
-        error: { code: 'PROMETHEUS_ERROR', message: err instanceof Error ? err.message : String(err) },
+        error: { code: 'PROMETHEUS_ERROR', message: getErrorMessage(err) },
       })
     }
   })
@@ -132,7 +133,7 @@ export function createQueryRouter(): Router {
     }
     catch (err) {
       res.status(502).json({
-        error: { code: 'PROMETHEUS_ERROR', message: err instanceof Error ? err.message : String(err) },
+        error: { code: 'PROMETHEUS_ERROR', message: getErrorMessage(err) },
       })
     }
   })
@@ -193,7 +194,7 @@ export function createQueryRouter(): Router {
     }
     catch (err) {
       res.status(502).json({
-        error: { code: 'PROMETHEUS_ERROR', message: err instanceof Error ? err.message : String(err) },
+        error: { code: 'PROMETHEUS_ERROR', message: getErrorMessage(err) },
       })
     }
   })
@@ -239,7 +240,7 @@ export function createQueryRouter(): Router {
     }
     catch (err) {
       res.status(502).json({
-        error: { code: 'PROMETHEUS_ERROR', message: err instanceof Error ? err.message : String(err) },
+        error: { code: 'PROMETHEUS_ERROR', message: getErrorMessage(err) },
       })
     }
   })
@@ -299,7 +300,7 @@ export function createQueryRouter(): Router {
         results[q.refId] = { status: 'success', data: outcome.value }
       }
       else {
-        const msg = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)
+        const msg = getErrorMessage(outcome.reason)
         results[q.refId] = { status: 'error', data: { resultType: 'matrix', result: [] }, error: msg }
       }
     })

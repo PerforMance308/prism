@@ -1,9 +1,11 @@
 import { createHmac, timingSafeEqual, randomUUID } from 'crypto';
 import { Router, raw as expressRaw } from 'express';
 import type { IEventBus } from '@agentic-obs/common';
-import { createLogger } from '@agentic-obs/common';
+import { createLogger, getErrorMessage } from '@agentic-obs/common';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
+import { ensureSafeUrl } from '../utils/url-validator.js';
 
 const log = createLogger('webhooks');
 
@@ -138,7 +140,7 @@ async function deliverWebhook(
 
       delivery.error = `HTTP ${res.status}`;
     } catch (err) {
-      delivery.error = err instanceof Error ? err.message : String(err);
+      delivery.error = getErrorMessage(err);
     }
 
     if (attempt < RETRY_DELAYS_MS.length - 1)
@@ -149,6 +151,18 @@ async function deliverWebhook(
   log.warn({ url: sub.url, event: eventType, error: delivery.error }, 'webhook delivery failed');
 }
 
+// -- Secret masking helper
+
+/** Mask a secret: show '••••••' + last 4 chars, or just '••••••' if too short. */
+function maskSecret(secret: string): string {
+  if (secret.length <= 4) return '••••••';
+  return '••••••' + secret.slice(-4);
+}
+
+function maskSubscription(sub: WebhookSubscription): WebhookSubscription {
+  return { ...sub, secret: maskSecret(sub.secret) };
+}
+
 // -- Router factory
 
 export interface WebhookRouterHandle {
@@ -157,7 +171,7 @@ export interface WebhookRouterHandle {
 }
 
 export function createWebhookRouter(bus?: IEventBus): Router {
-  const eventBus = bus ?? ({} as any);
+  const eventBus: Partial<IEventBus> = bus ?? {};
 
   // Per-instance state
   const subscriptions = new Map<string, WebhookSubscription>();
@@ -192,16 +206,26 @@ export function createWebhookRouter(bus?: IEventBus): Router {
       const source = req.params['source'] as string;
       const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body ?? ''));
 
-      // Signature verification if matching inbound subscription exists
+      // Require a matching inbound subscription — reject unregistered sources
+      const sourceSub = [...subscriptions.values()].find(
+        (s) => s.active && s.description === `inbound:${source}`,
+      );
+      if (!sourceSub) {
+        res.status(404).json({ code: 'NOT_FOUND', message: `No subscription registered for source "${source}"` });
+        return;
+      }
+
+      // Signature verification if the subscription has a secret configured
       const signature
         = (req.headers['x-hub-signature-256'] as string | undefined)
           ?? (req.headers['x-gitlab-token'] as string | undefined)
           ?? (req.headers['x-agentic-signature'] as string | undefined);
 
-      const sourceSub = [...subscriptions.values()].find(
-        (s) => s.active && s.description === `inbound:${source}`,
-      );
-      if (sourceSub && signature) {
+      if (sourceSub.secret) {
+        if (!signature) {
+          res.status(401).json({ code: 'MISSING_SIGNATURE', message: 'Webhook signature is required' });
+          return;
+        }
         if (!verifySignature(rawBody, signature, sourceSub.secret)) {
           res.status(401).json({ code: 'INVALID_SIGNATURE', message: 'Signature mismatch' });
           return;
@@ -226,6 +250,8 @@ export function createWebhookRouter(bus?: IEventBus): Router {
 
       const evt = {
         id: randomUUID(),
+        type: eventType,
+        timestamp: new Date().toISOString(),
         source,
         event: rawEventKey,
         payload,
@@ -238,12 +264,12 @@ export function createWebhookRouter(bus?: IEventBus): Router {
     },
   );
 
-  // Webhook subscription CRUD (authenticated)
-  router.get('/webhook-subscriptions', authMiddleware, (_req, res) => {
-    res.json([...subscriptions.values()]);
+  // Webhook subscription CRUD (authenticated + admin permission)
+  router.get('/webhook-subscriptions', authMiddleware, requirePermission('*:*'), (_req, res) => {
+    res.json([...subscriptions.values()].map(maskSubscription));
   });
 
-  router.post('/webhook-subscriptions', authMiddleware, (req: AuthenticatedRequest, res) => {
+  router.post('/webhook-subscriptions', authMiddleware, requirePermission('*:*'), async (req: AuthenticatedRequest, res) => {
     const { url, events, secret, active = true, description } = req.body as {
       url?: string;
       events?: string[];
@@ -254,6 +280,14 @@ export function createWebhookRouter(bus?: IEventBus): Router {
 
     if (!url || !events || !Array.isArray(events) || events.length === 0) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'url and events[] are required' });
+      return;
+    }
+
+    // SSRF protection: validate the subscription URL
+    try {
+      await ensureSafeUrl(url);
+    } catch (err) {
+      res.status(400).json({ code: 'INVALID_URL', message: err instanceof Error ? err.message : 'Invalid URL' });
       return;
     }
 
@@ -269,19 +303,20 @@ export function createWebhookRouter(bus?: IEventBus): Router {
 
     subscriptions.set(sub.id, sub);
     log.info({ id: sub.id, url }, 'webhook subscription created');
+    // Return full secret only on creation so the caller can store it
     res.status(201).json(sub);
   });
 
-  router.get('/webhook-subscriptions/:id', authMiddleware, (req, res) => {
+  router.get('/webhook-subscriptions/:id', authMiddleware, requirePermission('*:*'), (req, res) => {
     const sub = subscriptions.get(req.params['id'] as string);
     if (!sub) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Subscription not found' });
       return;
     }
-    res.json(sub);
+    res.json(maskSubscription(sub));
   });
 
-  router.put('/webhook-subscriptions/:id', authMiddleware, (req, res) => {
+  router.put('/webhook-subscriptions/:id', authMiddleware, requirePermission('*:*'), async (req, res) => {
     const sub = subscriptions.get(req.params['id'] as string);
     if (!sub) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Subscription not found' });
@@ -289,6 +324,17 @@ export function createWebhookRouter(bus?: IEventBus): Router {
     }
 
     const { url, events, secret, active, description } = req.body as Partial<WebhookSubscription>;
+
+    // SSRF protection: validate the updated URL if provided
+    if (url !== undefined) {
+      try {
+        await ensureSafeUrl(url);
+      } catch (err) {
+        res.status(400).json({ code: 'INVALID_URL', message: err instanceof Error ? err.message : 'Invalid URL' });
+        return;
+      }
+    }
+
     const updated: WebhookSubscription = {
       ...sub,
       ...(url !== undefined && { url }),
@@ -299,10 +345,10 @@ export function createWebhookRouter(bus?: IEventBus): Router {
     };
 
     subscriptions.set(sub.id, updated);
-    res.json(updated);
+    res.json(maskSubscription(updated));
   });
 
-  router.delete('/webhook-subscriptions/:id', authMiddleware, (req, res) => {
+  router.delete('/webhook-subscriptions/:id', authMiddleware, requirePermission('*:*'), (req, res) => {
     const id = req.params['id'] as string;
     if (!subscriptions.has(id)) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Subscription not found' });
@@ -313,7 +359,7 @@ export function createWebhookRouter(bus?: IEventBus): Router {
     res.status(204).send();
   });
 
-  router.get('/webhook-subscriptions/:id/deliveries', authMiddleware, (req, res) => {
+  router.get('/webhook-subscriptions/:id/deliveries', authMiddleware, requirePermission('*:*'), (req, res) => {
     const id = req.params['id'] as string;
     const deliveries = deliveryLog.filter((d) => d.subscriptionId === id);
     res.json(deliveries);

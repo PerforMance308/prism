@@ -184,7 +184,7 @@ export class AgentChatService {
     const latestReport = reportCandidates[reportCandidates.length - 1];
     const conclusion = await this.investigationStore.getConclusion(investigationId);
     const lower = message.toLowerCase();
-    const asksForDeeperInvestigation = /(follow up|deeper|deep dive|continue|investigate more|再查|继续调查|深入|细查)/i.test(lower);
+    const asksForDeeperInvestigation = /(follow up|deeper|deep dive|continue|investigate more|dig deeper|look closer|drill down)/i.test(lower);
 
     if (asksForDeeperInvestigation && this.feedStore) {
       sendEvent({ type: 'thinking', data: { content: 'Starting a follow-up investigation...' } });

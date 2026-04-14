@@ -149,7 +149,7 @@ export default function Home() {
         );
       } catch (err) {
         if (err instanceof Error && err.name !== 'AbortError') {
-          setSubmitError('Network error - please try again.');
+          setSubmitError(err.message || 'Network error - please try again.');
         }
         setSubmitting(false);
         setThinkingText(null);
@@ -186,7 +186,7 @@ export default function Home() {
             <span className="text-primary italic">investigating</span> today?
           </h1>
           <p className="text-on-surface-variant text-lg">
-            Prism is analyzing telemetry from Prometheus in real-time.
+            OpenObs is analyzing telemetry from Prometheus in real-time.
           </p>
         </motion.div>
 
@@ -223,7 +223,7 @@ export default function Home() {
                   onKeyDown={handleKeyDown}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  placeholder="Ask Prism to analyze, explain, or visualize..."
+                  placeholder="Ask OpenObs to analyze, explain, or visualize..."
                   rows={2}
                   disabled={submitting}
                   className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-sm text-on-surface placeholder:text-on-surface-variant/50 resize-none py-2"

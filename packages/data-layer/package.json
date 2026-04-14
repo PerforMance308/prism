@@ -19,7 +19,6 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
-    "@agentic-obs/agent-core": "*",
     "@agentic-obs/common": "*",
     "better-sqlite3": "^12.8.0",
     "drizzle-orm": "^0.45.1",

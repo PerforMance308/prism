@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../api/client.js';
 import ConfirmDialog from '../components/ConfirmDialog.js';
+import { datasourceUrlPlaceholder, llmBaseUrlPlaceholder } from '../constants/placeholders.js';
 
 // ─── Shared types ───
 
@@ -144,7 +145,7 @@ function DatasourceForm({ value, onChange, onSave, onCancel, onDelete, saving, i
           <input type="text" value={value.name} onChange={(e) => set({ name: e.target.value })} placeholder="My Prometheus" className={inputCls} />
         </Field>
         <Field label="URL" hint="e.g. http://prometheus:9090">
-          <input type="url" value={value.url} onChange={(e) => set({ url: e.target.value })} placeholder="http://localhost:9090" className={inputCls} />
+          <input type="url" value={value.url} onChange={(e) => set({ url: e.target.value })} placeholder={datasourceUrlPlaceholder(value.type)} className={inputCls} />
         </Field>
         <Field label="Environment">
           <select value={value.environment ?? 'prod'} onChange={(e) => set({ environment: e.target.value as EnvType })} className={selectCls}>
@@ -385,7 +386,7 @@ function LlmTab() {
           provider: (res.data.llm!.provider as LlmProvider) ?? prev.provider,
           model: res.data.llm!.model ?? prev.model,
           baseUrl: res.data.llm!.baseUrl ?? '',
-          region: (res.data.llm as any)?.region ?? '',
+          region: res.data.llm!.region ?? '',
         }));
       }
     });
@@ -441,7 +442,7 @@ function LlmTab() {
       {provider.needsUrl && (
         <div>
           <label className="block text-sm font-medium text-[var(--color-on-surface)] mb-1.5">{config.provider === 'ollama' ? 'Ollama URL' : 'Endpoint URL'}</label>
-          <input type="text" value={config.baseUrl} onChange={(e) => setConfig((prev) => ({ ...prev, baseUrl: e.target.value }))} placeholder={config.provider === 'ollama' ? 'http://localhost:11434' : 'https://your-resource.openai.azure.com'} className={inputCls} />
+          <input type="text" value={config.baseUrl} onChange={(e) => setConfig((prev) => ({ ...prev, baseUrl: e.target.value }))} placeholder={llmBaseUrlPlaceholder(config.provider)} className={inputCls} />
         </div>
       )}
 
@@ -587,7 +588,7 @@ export default function Settings() {
             {tab === 'datasources' && 'Connect to Prometheus, Loki, Elasticsearch and other data sources.'}
             {tab === 'llm' && 'Configure the AI model used for investigations and analysis.'}
             {tab === 'notifications' && 'Set up alert delivery channels.'}
-            {tab === 'danger' && 'Irreversible actions for your Prism instance.'}
+            {tab === 'danger' && 'Irreversible actions for your OpenObs instance.'}
           </p>
 
           {tab === 'datasources' && <DataSourcesTab />}

@@ -4,17 +4,7 @@ import type { Investigation, Hypothesis, Evidence } from '@agentic-obs/common';
 import { apiClient } from '../api/client.js';
 import HypothesisEvidence from '../components/HypothesisEvidence.js';
 import TopologyGraph from '../components/TopologyGraph.js';
-
-const STATUS_DOT: Record<string, string> = {
-  pending: 'bg-slate-400',
-  planning: 'bg-blue-400',
-  investigating: 'bg-amber-400',
-  evidencing: 'bg-violet-400',
-  explaining: 'bg-teal-400',
-  verifying: 'bg-cyan-400',
-  completed: 'bg-emerald-500',
-  failed: 'bg-red-500',
-};
+import { getInvestigationStatusStyle } from '../constants/status-styles.js';
 
 export default function EvidencePage() {
   const { id } = useParams<{ id: string }>();
@@ -73,7 +63,7 @@ export default function EvidencePage() {
 
   // Sort hypotheses by confidence descending
   const sorted = [...hypotheses].sort((a, b) => b.confidence - a.confidence);
-  const dotColor = STATUS_DOT[investigation.status] ?? 'bg-slate-400';
+  const dotColor = getInvestigationStatusStyle(investigation.status).dot;
 
   return (
     <div className="min-h-screen bg-white">

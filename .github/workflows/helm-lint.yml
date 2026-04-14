@@ -1,0 +1,25 @@
+name: Helm Lint
+
+on:
+  push:
+    branches: [main]
+    paths: ['helm/**']
+  pull_request:
+    paths: ['helm/**']
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - run: helm lint ./helm/openobs
+
+      - name: Template renders without errors
+        run: |
+          helm template openobs ./helm/openobs \
+            --set secretEnv.JWT_SECRET=ci-test-secret-minimum-32-characters \
+            --set secretEnv.LLM_API_KEY=sk-test > /dev/null

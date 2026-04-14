@@ -13,27 +13,27 @@ export interface DailyTrend {
   /** YYYY-MM-DD */
   date: string;
   investigations: number;
-  avg_duration_ms: number;
+  avgDurationMs: number;
 }
 
 export interface WeeklyTrend {
   /** ISO week start date (Monday) */
-  week_start: string;
+  weekStart: string;
   investigations: number;
-  avg_duration_ms: number;
+  avgDurationMs: number;
 }
 
 export interface QualityMetrics {
-  total_investigations: number;
-  adoption_rate: number;
-  avg_investigation_duration_ms: number;
-  avg_tokens_per_investigation: number;
-  avg_queries_per_investigation: number;
-  evidence_completeness: number;
-  proactive_hit_rate: number;
-  daily_trend: DailyTrend[];
-  weekly_trend: WeeklyTrend[];
-  computed_at: string;
+  totalInvestigations: number;
+  adoptionRate: number;
+  avgInvestigationDurationMs: number;
+  avgTokensPerInvestigation: number;
+  avgQueriesPerInvestigation: number;
+  evidenceCompleteness: number;
+  proactiveHitRate: number;
+  dailyTrend: DailyTrend[];
+  weeklyTrend: WeeklyTrend[];
+  computedAt: string;
 }
 
 // -- Helpers
@@ -58,14 +58,14 @@ export async function computeQualityMetrics(
   feedStoreInstance: IGatewayFeedStore,
 ): Promise<QualityMetrics> {
   const investigations = await investigationStore.findAll();
-  const total_investigations = investigations.length;
+  const totalInvestigations = investigations.length;
 
   // -- adoption rate
   const feedStats = await feedStoreInstance.getStats();
   const positive
     = (feedStats.byVerdict['useful'] ?? 0)
       + (feedStats.byVerdict['root_cause_correct'] ?? 0);
-  const adoption_rate
+  const adoptionRate
     = feedStats.withFeedback > 0 ? positive / feedStats.withFeedback : 0;
 
   // -- Investigation duration
@@ -74,7 +74,7 @@ export async function computeQualityMetrics(
     (i) => new Date(i.updatedAt).getTime() - new Date(i.createdAt).getTime(),
   );
 
-  const avg_investigation_duration_ms
+  const avgInvestigationDurationMs
     = durations.length > 0
       ? durations.reduce((s, d) => s + d, 0) / durations.length
       : 0;
@@ -101,11 +101,11 @@ export async function computeQualityMetrics(
     }
   }
 
-  const avg_tokens_per_investigation = invWithCost > 0 ? totalTokens / invWithCost : 0;
-  const avg_queries_per_investigation = invWithCost > 0 ? totalQueries / invWithCost : 0;
+  const avgTokensPerInvestigation = invWithCost > 0 ? totalTokens / invWithCost : 0;
+  const avgQueriesPerInvestigation = invWithCost > 0 ? totalQueries / invWithCost : 0;
 
   // -- proactive hit rate
-  const proactive_hit_rate = feedStats.proactiveHitRate;
+  const proactiveHitRate = feedStats.proactiveHitRate;
 
   // -- evidence completeness
   const completenessRatios: number[] = [];
@@ -114,7 +114,7 @@ export async function computeQualityMetrics(
       completenessRatios.push(inv.evidence.length / inv.hypotheses.length);
   }
 
-  const evidence_completeness
+  const evidenceCompleteness
     = completenessRatios.length > 0
       ? completenessRatios.reduce((s, r) => s + r, 0) / completenessRatios.length
       : 0;
@@ -132,43 +132,43 @@ export async function computeQualityMetrics(
     dailyMap.set(date, entry);
   }
 
-  const daily_trend: DailyTrend[] = [...dailyMap.entries()]
+  const dailyTrend: DailyTrend[] = [...dailyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, { count, totalDuration }]) => ({
       date,
       investigations: count,
-      avg_duration_ms: count > 0 ? Math.round(totalDuration / count) : 0,
+      avgDurationMs: count > 0 ? Math.round(totalDuration / count) : 0,
     }));
 
   // -- weekly trend
   const weeklyMap = new Map<string, { count: number; totalDuration: number }>();
-  for (const d of daily_trend) {
+  for (const d of dailyTrend) {
     const weekStart = toWeekStart(d.date);
     const entry = weeklyMap.get(weekStart) ?? { count: 0, totalDuration: 0 };
     entry.count += d.investigations;
-    entry.totalDuration += d.avg_duration_ms * d.investigations;
+    entry.totalDuration += d.avgDurationMs * d.investigations;
     weeklyMap.set(weekStart, entry);
   }
 
-  const weekly_trend: WeeklyTrend[] = [...weeklyMap.entries()]
+  const weeklyTrend: WeeklyTrend[] = [...weeklyMap.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([week_start, { count, totalDuration }]) => ({
-      week_start,
+    .map(([weekStart, { count, totalDuration }]) => ({
+      weekStart,
       investigations: count,
-      avg_duration_ms: count > 0 ? Math.round(totalDuration / count) : 0,
+      avgDurationMs: count > 0 ? Math.round(totalDuration / count) : 0,
     }));
 
   return {
-    total_investigations,
-    adoption_rate,
-    proactive_hit_rate,
-    avg_investigation_duration_ms,
-    avg_tokens_per_investigation,
-    avg_queries_per_investigation,
-    evidence_completeness,
-    daily_trend,
-    weekly_trend,
-    computed_at: new Date().toISOString(),
+    totalInvestigations,
+    adoptionRate,
+    proactiveHitRate,
+    avgInvestigationDurationMs,
+    avgTokensPerInvestigation,
+    avgQueriesPerInvestigation,
+    evidenceCompleteness,
+    dailyTrend,
+    weeklyTrend,
+    computedAt: new Date().toISOString(),
   };
 }
 
@@ -192,4 +192,3 @@ export function createMetaRouter(deps: MetaRouterDeps): Router {
 
   return router;
 }
-

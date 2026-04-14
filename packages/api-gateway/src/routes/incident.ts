@@ -233,26 +233,29 @@ export function createIncidentRouter(deps: IncidentRouterDeps): Router {
         return;
       }
 
-      // Build investigation data from linked investigation IDs
-      const resolvedInvs = await Promise.all(
+      // Build investigation data from linked investigation IDs.
+      // getConclusion() is optional on the store — fall back gracefully.
+      const resolvedInvs = (await Promise.all(
         incident.investigationIds.map((invId) => investigationStore.findById(invId)),
-      );
-      const investigations = resolvedInvs
-        .filter(Boolean)
-        .map((inv) => ({
-          id: inv!.id,
-          intents: inv!.intent,
-          status: inv!.status,
-          conclusionSummary: (inv as any).conclusion?.summary ?? '',
-          hypotheses: inv!.hypotheses.map((h) => ({
+      )).filter((inv): inv is NonNullable<typeof inv> => inv != null);
+
+      const investigations = await Promise.all(resolvedInvs.map(async (inv) => {
+        const conclusion = await investigationStore.getConclusion(inv.id);
+        return {
+          id: inv.id,
+          intents: inv.intent,
+          status: inv.status,
+          conclusionSummary: conclusion?.summary ?? '',
+          hypotheses: inv.hypotheses.map((h) => ({
             description: h.description,
             confidence: h.confidence,
           })),
-          evidence: inv!.evidence.map((e: any) => ({
+          evidence: inv.evidence.map((e) => ({
             type: e.type,
             summary: e.summary,
           })),
-        }));
+        };
+      }));
 
       const input: PostMortemInput = {
         incident: {

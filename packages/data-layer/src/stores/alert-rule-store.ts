@@ -251,7 +251,9 @@ export class AlertRuleStore implements Persistable {
     for (const cb of this.listeners) {
       try {
         cb(event, rule);
-      } catch {}
+      } catch {
+        // Listener errors must not prevent other listeners from running.
+      }
     }
   }
 

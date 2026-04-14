@@ -1,8 +1,14 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { registry } from '../metrics.js';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
 
 export const metricsRouter = Router();
+
+metricsRouter.use((req: Request, res: Response, next) => {
+  authMiddleware(req as AuthenticatedRequest, res, next);
+});
 
 /**
  * GET /api/metrics

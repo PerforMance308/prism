@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { getErrorMessage } from '@agentic-obs/common';
 import type { StructuredIntent, Hypothesis, Evidence } from '@agentic-obs/common';
 import type { SystemContext } from '../context/types.js';
 import type { InvestigationInput, InvestigationOutput } from '../investigation/types.js';
@@ -107,7 +108,7 @@ export class AgentOrchestrator extends EventEmitter implements OrchestratorEmitt
         type: 'error',
         state: 'failed',
         investigationId,
-        error: err instanceof Error ? err.message : String(err),
+        error: getErrorMessage(err),
         fatal: true,
       });
       return {
@@ -161,7 +162,7 @@ export class AgentOrchestrator extends EventEmitter implements OrchestratorEmitt
       covered.push('intent');
       this.emitStep(state, investigationId, Date.now() - intentStart, false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = getErrorMessage(err);
       this.emitDegraded(
         state,
         investigationId,
@@ -207,7 +208,7 @@ export class AgentOrchestrator extends EventEmitter implements OrchestratorEmitt
       }
       this.emitStep(state, investigationId, Date.now() - contextStart, false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = getErrorMessage(err);
       this.emitDegraded(state, investigationId, `Context unavailable: ${msg}`, covered, ['context']);
       if (!this.config.degradeOnError) throw err;
       uncovered.push('context');
@@ -242,7 +243,7 @@ export class AgentOrchestrator extends EventEmitter implements OrchestratorEmitt
         }
         this.emitStep(state, investigationId, Date.now() - invStart, false);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = getErrorMessage(err);
         this.emitDegraded(
           state,
           investigationId,
@@ -287,7 +288,7 @@ export class AgentOrchestrator extends EventEmitter implements OrchestratorEmitt
         }
         this.emitStep(state, investigationId, Date.now() - evStart, false);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
+        const msg = getErrorMessage(err);
         this.emitDegraded(
           state,
           investigationId,

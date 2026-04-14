@@ -11,7 +11,7 @@ import { investigationOpenApiSpec } from './openapi.js';
 import type { SharePermission, IGatewayInvestigationStore, IGatewayFeedStore, IGatewayShareStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
 import type { CreateInvestigationBody, FollowUpBody, FeedbackBody } from './types.js';
 import { initSse, sendSseEvent, sendSseKeepAlive, closeSse } from './sse.js';
-import { LiveOrchestratorRunner } from './live-orchestrator-runner.js';
+import { LiveOrchestratorRunner } from '../../services/investigation-runner-service.js';
 import type { OrchestratorRunner } from './orchestrator-runner.js';
 import { getWorkspaceId } from '../../middleware/workspace-context.js';
 

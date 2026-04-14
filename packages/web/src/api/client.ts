@@ -41,6 +41,10 @@ class ApiClient {
     });
 
     if (!res.ok) {
+      if (res.status === 401 && !import.meta.env.DEV) {
+        window.location.href = '/login';
+        return { data: null as T, error: { code: 'UNAUTHORIZED', message: 'Redirecting to login...' } };
+      }
       const error = await res.json().catch(() => ({ code: 'UNKNOWN', message: res.statusText }));
       return { data: null as T, error };
     }
@@ -67,6 +71,13 @@ class ApiClient {
   put<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(path, {
       method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  }
+
+  patch<T>(path: string, body: unknown): Promise<ApiResponse<T>> {
+    return this.request<T>(path, {
+      method: 'PATCH',
       body: JSON.stringify(body),
     });
   }
@@ -98,7 +109,13 @@ class ApiClient {
     });
 
     if (!res.ok || !res.body) {
-      throw new Error(`Stream request failed: ${res.statusText}`);
+      if (res.status === 401) {
+        // In dev mode the frontend skips login, but the backend still needs
+        // DEV_AUTH_BYPASS=true in .env.  Surface a clear message instead of
+        // a cryptic "Network error".
+        throw new Error('Authentication required — add DEV_AUTH_BYPASS=true to .env and restart the server, or log in first.');
+      }
+      throw new Error(`Stream request failed: ${res.status} ${res.statusText}`);
     }
 
     const reader = res.body.getReader();
@@ -157,3 +174,39 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient(BASE_URL);
+
+/**
+ * Throwing convenience wrapper around apiClient.
+ *
+ * apiClient methods return `{ data, error }`. For code paths that prefer to
+ * bubble failures via thrown errors (try/catch) rather than early-return, use
+ * these helpers — they throw an Error with the server message if the request
+ * fails, otherwise return the data directly.
+ */
+export const api = {
+  async get<T>(path: string): Promise<T> {
+    const { data, error } = await apiClient.get<T>(path);
+    if (error) throw new Error(error.message ?? 'Request failed');
+    return data;
+  },
+  async post<T>(path: string, body: unknown): Promise<T> {
+    const { data, error } = await apiClient.post<T>(path, body);
+    if (error) throw new Error(error.message ?? 'Request failed');
+    return data;
+  },
+  async put<T>(path: string, body: unknown): Promise<T> {
+    const { data, error } = await apiClient.put<T>(path, body);
+    if (error) throw new Error(error.message ?? 'Request failed');
+    return data;
+  },
+  async patch<T>(path: string, body: unknown): Promise<T> {
+    const { data, error } = await apiClient.patch<T>(path, body);
+    if (error) throw new Error(error.message ?? 'Request failed');
+    return data;
+  },
+  async delete<T>(path: string): Promise<T> {
+    const { data, error } = await apiClient.delete<T>(path);
+    if (error) throw new Error(error.message ?? 'Request failed');
+    return data;
+  },
+};

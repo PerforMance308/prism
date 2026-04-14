@@ -17,8 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentic-obs/common": "*",
-    "zod": "*"
+    "@agentic-obs/common": "*"
   },
   "devDependencies": {
     "typescript": "*",

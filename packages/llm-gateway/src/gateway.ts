@@ -1,4 +1,5 @@
 import { randomUUID, createHash } from 'node:crypto';
+import { getErrorMessage } from '@agentic-obs/common';
 import type { LLMProvider, LLMOptions, LLMResponse, CompletionMessage } from './types.js';
 import { AuditLogger, type AuditEntry } from './audit.js';
 
@@ -132,7 +133,7 @@ export class LLMGateway {
       totalTokens: 0,
       latencyMs,
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
     });
   }
 

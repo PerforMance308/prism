@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import type { Investigation } from '@agentic-obs/common';
 import type { ExplanationResult } from '@agentic-obs/common';
 import type { SqliteClient } from '../../db/sqlite-client.js';
+import { toJsonColumn } from '../json-column.js';
 import {
   investigations,
   investigationFollowUps,
@@ -95,8 +96,8 @@ export class SqliteInvestigationRepository implements IInvestigationRepository {
         sessionId,
         userId,
         intent,
-        structuredIntent: structuredIntent as unknown as Record<string, unknown>,
-        plan: plan as unknown as Record<string, unknown>,
+        structuredIntent: toJsonColumn(structuredIntent),
+        plan: toJsonColumn(plan),
         status,
         hypotheses: isGatewayParams ? [] : (data as Investigation).hypotheses,
         actions: isGatewayParams ? [] : ((data as Investigation).actions ?? []),
@@ -199,6 +200,14 @@ export class SqliteInvestigationRepository implements IInvestigationRepository {
     return rows.map(rowToInvestigation);
   }
 
+  getArchived(): Promise<Investigation[]> {
+    return this.findArchived();
+  }
+
+  restoreFromArchive(id: string): Promise<Investigation | undefined> {
+    return this.restore(id);
+  }
+
   // — Follow-ups
 
   async addFollowUp(investigationId: string, question: string): Promise<FollowUpRecord> {
@@ -268,12 +277,12 @@ export class SqliteInvestigationRepository implements IInvestigationRepository {
     if (existing.length > 0) {
       await this.db
         .update(investigationConclusions)
-        .set({ conclusion: conclusion as unknown as Record<string, unknown> })
+        .set({ conclusion: toJsonColumn(conclusion) })
         .where(eq(investigationConclusions.investigationId, id));
     } else {
       await this.db
         .insert(investigationConclusions)
-        .values({ investigationId: id, conclusion: conclusion as unknown as Record<string, unknown> });
+        .values({ investigationId: id, conclusion: toJsonColumn(conclusion) });
     }
   }
 

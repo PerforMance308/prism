@@ -1,5 +1,6 @@
 // Context Agent - assembles SystemContext from topology, changes, SLO, and incidents
 
+import { getErrorMessage } from '@agentic-obs/common';
 import type { StructuredIntent } from '@agentic-obs/common';
 import type { TopologyStore } from '@agentic-obs/data-layer';
 import type { ChangeEventStore } from '@agentic-obs/adapters';
@@ -39,7 +40,7 @@ export class ContextAgent implements Agent<StructuredIntent, SystemContext> {
     } catch (err) {
       return {
         success: false,
-        error: `ContextAgent failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: `ContextAgent failed: ${getErrorMessage(err)}`,
       };
     }
   }

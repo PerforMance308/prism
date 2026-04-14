@@ -83,7 +83,10 @@ export class EventEmittingFeedRepository implements IGatewayFeedStore {
     for (const fn of this.subscribers) {
       try {
         fn(item);
-      } catch {}
+      } catch {
+        // Subscriber callbacks must not be able to break notification delivery
+        // to other subscribers. Swallow errors by design.
+      }
     }
   }
 }

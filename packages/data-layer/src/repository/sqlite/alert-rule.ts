@@ -9,6 +9,7 @@ import type {
   SilenceStatus,
 } from '@agentic-obs/common';
 import type { SqliteClient } from '../../db/sqlite-client.js';
+import { toJsonColumn } from '../json-column.js';
 import {
   alertRules,
   alertHistory,
@@ -113,10 +114,10 @@ export class SqliteAlertRuleRepository implements IAlertRuleRepository {
         name: data.name,
         description: data.description,
         originalPrompt: data.originalPrompt,
-        condition: data.condition as unknown as Record<string, unknown>,
+        condition: toJsonColumn(data.condition),
         evaluationIntervalSec: data.evaluationIntervalSec,
         severity: data.severity,
-        labels: data.labels as unknown as Record<string, unknown>,
+        labels: toJsonColumn(data.labels),
         state: 'normal',
         stateChangedAt: now,
         notificationPolicyId: data.notificationPolicyId,
@@ -227,7 +228,7 @@ export class SqliteAlertRuleRepository implements IAlertRuleRepository {
       value: value ?? 0,
       threshold: rule.condition.threshold,
       timestamp: now,
-      labels: (rule.labels ?? {}) as unknown as Record<string, unknown>,
+      labels: toJsonColumn(rule.labels ?? {}),
     });
 
     const patch: Partial<AlertRule> = {

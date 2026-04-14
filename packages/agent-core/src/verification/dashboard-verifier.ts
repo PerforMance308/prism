@@ -5,16 +5,12 @@ import { testPrometheusQuery } from './prometheus-tester.js';
 
 export interface DashboardVerifierInput {
   dashboard: Dashboard;
-  /** @deprecated Use metricsAdapter instead */
-  prometheusUrl?: string;
-  /** @deprecated Use metricsAdapter instead */
-  prometheusHeaders?: Record<string, string>;
   metricsAdapter?: IMetricsAdapter;
 }
 
 export class DashboardVerifier {
   async verify(input: DashboardVerifierInput): Promise<VerificationReport> {
-    const { dashboard, prometheusUrl, prometheusHeaders, metricsAdapter } = input;
+    const { dashboard, metricsAdapter } = input;
     const issues: VerificationIssue[] = [];
     const checksRun: string[] = [];
 
@@ -117,9 +113,8 @@ export class DashboardVerifier {
       }
     }
 
-    // 7. query_valid - test queries against Prometheus if adapter or URL is provided
-    const queryTarget = metricsAdapter ?? prometheusUrl;
-    if (queryTarget) {
+    // 7. query_valid - test queries against Prometheus if adapter is provided
+    if (metricsAdapter) {
       checksRun.push('query_valid');
       for (const panel of dashboard.panels ?? []) {
         const queries = this.getPanelQueries(panel);
@@ -127,11 +122,7 @@ export class DashboardVerifier {
           // Skip queries containing variable references - they can't be validated without substitution
           if (this.extractVariableRefs(q.expr).length > 0) continue;
 
-          const result = await testPrometheusQuery(
-            queryTarget,
-            q.expr,
-            prometheusHeaders,
-          );
+          const result = await testPrometheusQuery(metricsAdapter, q.expr);
           if (result.unreachable) {
             issues.push({
               code: 'query_valid',

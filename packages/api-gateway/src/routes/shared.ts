@@ -2,13 +2,12 @@
 
 import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import type { IShareRepository } from '@agentic-obs/data-layer';
-import type { IGatewayInvestigationStore } from '../repositories/types.js';
+import type { IGatewayShareStore, IGatewayInvestigationStore } from '@agentic-obs/data-layer';
 import { authMiddleware } from '../middleware/auth.js';
 import type { AuthenticatedRequest } from '../middleware/auth.js';
 
 export interface SharedRouterDeps {
-  shareRepo: IShareRepository;
+  shareRepo: IGatewayShareStore;
   investigationStore: IGatewayInvestigationStore;
 }
 

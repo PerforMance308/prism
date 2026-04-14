@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { createLogger } from '@agentic-obs/common'
 import { OidcProvider } from './oidc-provider.js'
+import { getJwtSecret } from './jwt-secret.js'
 
 const log = createLogger('auth-manager')
 import { OAuthProvider } from './oauth-provider.js'
@@ -10,11 +11,7 @@ import { sessionStore } from './session-store.js'
 import { userStore } from './user-store.js'
 import type { User, UserRole, AuthProviderConfig, UserInfoClaims } from './types.js'
 
-const JWT_SECRET: string = (() => {
-  const secret = process.env['JWT_SECRET']
-  if (!secret) throw new Error('[auth-manager] FATAL: JWT_SECRET environment variable is required. Set a cryptographically random secret of at least 32 characters.')
-  return secret
-})()
+const JWT_SECRET = getJwtSecret('auth-manager')
 const ACCESS_TOKEN_TTL_SEC = 15 * 60 // 15 minutes
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
@@ -204,8 +201,12 @@ if (process.env['SEED_ADMIN'] === 'true' && userStore.count() === 0) {
   const seedEmail = process.env['SEED_ADMIN_EMAIL']
   const seedPassword = process.env['SEED_ADMIN_PASSWORD']
   if (seedEmail && seedPassword) {
-    createLocalUser(seedEmail, seedPassword, 'Admin User', 'admin').catch((err) => {
-      log.debug({ err }, 'failed to seed admin user (may already exist)')
-    })
+    if (seedPassword.length < 12) {
+      log.warn('SEED_ADMIN_PASSWORD must be at least 12 characters; skipping admin seed')
+    } else {
+      createLocalUser(seedEmail, seedPassword, 'Admin User', 'admin').catch((err) => {
+        log.debug({ err }, 'failed to seed admin user (may already exist)')
+      })
+    }
   }
 }

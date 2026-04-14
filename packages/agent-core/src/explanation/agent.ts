@@ -1,7 +1,7 @@
 // ExplanationAgent - generates structured SRE conclusions from hypotheses + evidence
 
 import type { LLMGateway } from '@agentic-obs/llm-gateway';
-import { createLogger } from '@agentic-obs/common';
+import { createLogger, getErrorMessage } from '@agentic-obs/common';
 import type { Hypothesis, Action } from '@agentic-obs/common';
 
 const log = createLogger('explanation-agent');
@@ -115,7 +115,7 @@ export class ExplanationAgent implements Agent<ExplanationInput, StructuredConcl
       const data = await this.explain(input);
       return { success: true, data };
     } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -144,7 +144,19 @@ export class ExplanationAgent implements Agent<ExplanationInput, StructuredConcl
       throw new ExplanationParseError('Missing or invalid "hypotheses" array', raw);
     }
 
-    const llmConclusion = obj as unknown as LLMConclusion;
+    // Extract typed fields from the validated LLM response object.
+    // summary (string) and hypotheses (array) are validated above;
+    // remaining fields default gracefully via ?? so missing keys are safe.
+    const llmSummary = obj['summary'] as string;
+    const llmHypotheses = obj['hypotheses'] as LLMHypothesisEntry[];
+    const llmImpact = obj['impact'] as LLMConclusion['impact'] | undefined;
+    const llmActions = Array.isArray(obj['recommendedActions'])
+      ? (obj['recommendedActions'] as LLMAction[])
+      : [];
+    const llmRisks = Array.isArray(obj['risks']) ? (obj['risks'] as string[]) : [];
+    const llmUncoveredAreas = Array.isArray(obj['uncoveredAreas'])
+      ? (obj['uncoveredAreas'] as string[])
+      : [];
 
     // Build hypothesis index for lookup
     const hypothesisById = new Map<string, Hypothesis>(
@@ -152,7 +164,7 @@ export class ExplanationAgent implements Agent<ExplanationInput, StructuredConcl
     );
 
     // Map ranked hypotheses - only include entries that match input hypothesis IDs
-    const rankedHypotheses: RankedHypothesis[] = llmConclusion.hypotheses
+    const rankedHypotheses: RankedHypothesis[] = llmHypotheses
       .filter((e) => hypothesisById.has(e.hypothesisId))
       .map((e) => ({
         hypothesis: hypothesisById.get(e.hypothesisId)!,
@@ -177,14 +189,14 @@ export class ExplanationAgent implements Agent<ExplanationInput, StructuredConcl
     }
 
     const impact: ImpactAssessment = {
-      severity: llmConclusion.impact?.severity ?? 'medium',
-      affectedServices: llmConclusion.impact?.affectedServices ?? [input.context.entity],
-      affectedUsers: llmConclusion.impact?.affectedUsers ?? 'Unknown',
-      description: llmConclusion.impact?.description ?? '',
+      severity: llmImpact?.severity ?? 'medium',
+      affectedServices: llmImpact?.affectedServices ?? [input.context.entity],
+      affectedUsers: llmImpact?.affectedUsers ?? 'Unknown',
+      description: llmImpact?.description ?? '',
     };
 
     let actionSeq = 0;
-    const recommendedActions: RecommendedAction[] = (llmConclusion.recommendedActions ?? []).map((a) => {
+    const recommendedActions: RecommendedAction[] = llmActions.map((a) => {
       const action: Action = {
         id: `act-${++actionSeq}`,
         investigationId: '',
@@ -204,12 +216,12 @@ export class ExplanationAgent implements Agent<ExplanationInput, StructuredConcl
     });
 
     const conclusion: StructuredConclusion = {
-      summary: llmConclusion.summary,
+      summary: llmSummary,
       hypotheses: rankedHypotheses,
       impact,
       recommendedActions,
-      risks: llmConclusion.risks ?? [],
-      uncoveredAreas: llmConclusion.uncoveredAreas ?? [],
+      risks: llmRisks,
+      uncoveredAreas: llmUncoveredAreas,
       generatedAt: new Date().toISOString(),
     };
 

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { SavedInvestigationReport, InvestigationReportSection } from '@agentic-obs/common';
 import type { SqliteClient } from '../../db/sqlite-client.js';
+import { toJsonColumn } from '../json-column.js';
 import { investigationReports } from '../../db/sqlite-schema.js';
 import type { IInvestigationReportRepository } from '../interfaces.js';
 
@@ -34,7 +35,7 @@ export class SqliteInvestigationReportRepository implements IInvestigationReport
           dashboardId: report.dashboardId,
           goal: report.goal,
           summary: report.summary,
-          sections: report.sections as unknown as Record<string, unknown>,
+          sections: toJsonColumn(report.sections),
         })
         .where(eq(investigationReports.id, report.id));
     } else {
@@ -43,7 +44,7 @@ export class SqliteInvestigationReportRepository implements IInvestigationReport
         dashboardId: report.dashboardId,
         goal: report.goal,
         summary: report.summary,
-        sections: report.sections as unknown as Record<string, unknown>,
+        sections: toJsonColumn(report.sections),
         createdAt: report.createdAt,
       });
     }

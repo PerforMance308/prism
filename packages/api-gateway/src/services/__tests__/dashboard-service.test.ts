@@ -11,11 +11,13 @@ vi.mock('../../routes/llm-factory.js', () => ({
 }));
 
 vi.mock('@agentic-obs/agent-core', () => ({
-  DashboardOrchestratorAgent: vi.fn().mockImplementation(() => ({
-    handleMessage: vi.fn().mockResolvedValue('Here is your dashboard analysis.'),
-    consumeConversationActions: vi.fn().mockReturnValue([]),
-    consumeNavigate: vi.fn().mockReturnValue(undefined),
-  })),
+  DashboardOrchestratorAgent: vi.fn(function MockDashboardOrchestratorAgent() {
+    return {
+      handleMessage: vi.fn().mockResolvedValue('Here is your dashboard analysis.'),
+      consumeConversationActions: vi.fn().mockReturnValue([]),
+      consumeNavigate: vi.fn().mockReturnValue(undefined),
+    };
+  }),
 }));
 
 import { DashboardService } from '../dashboard-service.js';
@@ -166,7 +168,7 @@ describe('DashboardService', () => {
       llm: { provider: 'anthropic', apiKey: 'sk-test', model: 'claude-sonnet-4-6' },
     });
 
-    vi.mocked(DashboardOrchestratorAgent).mockImplementationOnce((args: any) => {
+    vi.mocked(DashboardOrchestratorAgent).mockImplementationOnce(function MockDashboardOrchestratorAgent(args: any) {
       return {
         handleMessage: vi.fn().mockImplementation(async () => {
           args.sendEvent({

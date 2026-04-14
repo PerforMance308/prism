@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { createLogger, DEFAULT_LLM_MODEL, LLMUnavailableError } from '@agentic-obs/common';
+import { createLogger, DEFAULT_LLM_MODEL, LLMUnavailableError, getErrorMessage } from '@agentic-obs/common';
 
 const log = createLogger('execution-agent');
 import type { LLMGateway } from '@agentic-obs/llm-gateway';
@@ -159,7 +159,7 @@ export class LLMExecutionAgent {
           output: null,
           rollbackable: false,
           executionId,
-          error: `Failed to resolve credential '${ref}': ${err instanceof Error ? err.message : String(err)}`,
+          error: `Failed to resolve credential '${ref}': ${getErrorMessage(err)}`,
         };
         this.recordAudit(action, result);
         return result;
@@ -189,7 +189,7 @@ export class LLMExecutionAgent {
         output: null,
         rollbackable: false,
         executionId,
-        error: `Validation threw: ${err instanceof Error ? err.message : String(err)}`,
+        error: `Validation threw: ${getErrorMessage(err)}`,
       };
       this.recordAudit(action, result, context?.investigationId);
       return result;
@@ -225,7 +225,7 @@ export class LLMExecutionAgent {
         output: null,
         rollbackable: false,
         executionId,
-        error: `Execute threw: ${err instanceof Error ? err.message : String(err)}`,
+        error: `Execute threw: ${getErrorMessage(err)}`,
       };
     }
 

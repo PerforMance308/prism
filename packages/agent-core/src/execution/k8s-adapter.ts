@@ -8,6 +8,7 @@
  */
 
 import { randomUUID } from 'crypto';
+import { getErrorMessage } from '@agentic-obs/common';
 import type {
   ExecutionAdapter,
   AdapterAction,
@@ -214,7 +215,7 @@ export class K8sExecutionAdapter implements ExecutionAdapter {
         output: null,
         rollbackable: false,
         executionId,
-        error: err instanceof Error ? err.message : String(err),
+        error: getErrorMessage(err),
       };
     }
   }
@@ -266,7 +267,7 @@ export class K8sExecutionAdapter implements ExecutionAdapter {
         output: null,
         rollbackable: false,
         executionId: rbId,
-        error: err instanceof Error ? err.message : String(err),
+        error: getErrorMessage(err),
       };
     }
   }

@@ -9,26 +9,46 @@ import type {
 } from '@agentic-obs/common';
 import type { INotificationRepository, IAlertRuleRepository } from '@agentic-obs/data-layer';
 import { defaultNotificationStore, defaultAlertRuleStore } from '@agentic-obs/data-layer';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
+import { ensureSafeUrl } from '../utils/url-validator.js';
 
 export interface NotificationsRouterDeps {
   notificationStore?: INotificationRepository;
   alertRuleStore?: IAlertRuleRepository;
 }
 
+function withPermission(permission: string) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    requirePermission(permission)(req as AuthenticatedRequest, res, next);
+  };
+}
+
+function extractWebhookUrl(settings: Record<string, string> | undefined): string {
+  return settings?.url ?? settings?.webhookUrl ?? '';
+}
+
 export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): Router {
   const notifStore = deps.notificationStore ?? defaultNotificationStore;
   const alertStore = deps.alertRuleStore ?? defaultAlertRuleStore;
   const router = Router();
+  const requireDashboardRead = withPermission('dashboard:read');
+  const requireDashboardWrite = withPermission('dashboard:write');
+
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req as AuthenticatedRequest, res, next);
+  });
 
   // -- Contact Points
 
   // GET /api/notifications/contact-points
-  router.get('/contact-points', async (_req: Request, res: Response) => {
+  router.get('/contact-points', requireDashboardRead, async (_req: Request, res: Response) => {
     res.json(await notifStore.findAllContactPoints());
   });
 
   // GET /api/notifications/contact-points/:id
-  router.get('/contact-points/:id', async (req: Request, res: Response) => {
+  router.get('/contact-points/:id', requireDashboardRead, async (req: Request, res: Response) => {
     const cp = await notifStore.findContactPointById(req.params['id'] ?? '');
     if (!cp) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Contact point not found' });
@@ -38,7 +58,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // POST /api/notifications/contact-points
-  router.post('/contact-points', async (req: Request, res: Response) => {
+  router.post('/contact-points', requireDashboardWrite, async (req: Request, res: Response) => {
     const body = req.body as Partial<ContactPoint>;
     if (!body?.name) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'name is required' });
@@ -53,7 +73,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // PUT /api/notifications/contact-points/:id
-  router.put('/contact-points/:id', async (req: Request, res: Response) => {
+  router.put('/contact-points/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const updated = await notifStore.updateContactPoint(
       req.params['id'] ?? '',
       req.body as Partial<Omit<ContactPoint, 'id' | 'createdAt'>>,
@@ -66,7 +86,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // DELETE /api/notifications/contact-points/:id
-  router.delete('/contact-points/:id', async (req: Request, res: Response) => {
+  router.delete('/contact-points/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const deleted = await notifStore.deleteContactPoint(req.params['id'] ?? '');
     if (!deleted) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Contact point not found' });
@@ -76,7 +96,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // POST /api/notifications/contact-points/:id/test
-  router.post('/contact-points/:id/test', async (req: Request, res: Response, next: NextFunction) => {
+  router.post('/contact-points/:id/test', requireDashboardWrite, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const cp = await notifStore.findContactPointById(req.params['id'] ?? '');
       if (!cp) {
@@ -93,13 +113,14 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
           || integration.type === 'discord'
           || integration.type === 'teams'
         ) {
-          const url = integration.settings?.url ?? integration.settings?.webhookUrl ?? '';
+          const url = extractWebhookUrl(integration.settings);
           try {
+            const safeUrl = await ensureSafeUrl(url);
             const payload = {
-              text: `Test notification from Agentic Observability Platform - contact point "${cp.name}" is working correctly.`,
+              text: `Test notification from OpenObs - contact point "${cp.name}" is working correctly.`,
               username: 'Agentic Obs',
             };
-            const resp = await fetch(url, {
+            const resp = await fetch(safeUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
@@ -145,12 +166,12 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   // -- Policy Tree
 
   // GET /api/notifications/policies
-  router.get('/policies', async (_req: Request, res: Response) => {
+  router.get('/policies', requireDashboardRead, async (_req: Request, res: Response) => {
     res.json(await notifStore.getPolicyTree());
   });
 
   // PUT /api/notifications/policies - replace entire tree
-  router.put('/policies', async (req: Request, res: Response) => {
+  router.put('/policies', requireDashboardWrite, async (req: Request, res: Response) => {
     const body = req.body as NotificationPolicyNode;
     if (!body || !body.id) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'Valid policy tree with id is required' });
@@ -162,7 +183,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // POST /api/notifications/policies/:parentId/children
-  router.post('/policies/:parentId/children', async (req: Request, res: Response) => {
+  router.post('/policies/:parentId/children', requireDashboardWrite, async (req: Request, res: Response) => {
     const body = req.body as Partial<Omit<NotificationPolicyNode, 'id' | 'children' | 'createdAt' | 'updatedAt'>>;
     if (!body?.contactPointId) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'contactPointId is required' });
@@ -190,7 +211,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // PUT /api/notifications/policies/:id
-  router.put('/policies/:id', async (req: Request, res: Response) => {
+  router.put('/policies/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const updated = await notifStore.updatePolicy(
       req.params['id'] ?? '',
       req.body as Partial<Omit<NotificationPolicyNode, 'id' | 'children' | 'createdAt'>>,
@@ -203,7 +224,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // DELETE /api/notifications/policies/:id
-  router.delete('/policies/:id', async (req: Request, res: Response) => {
+  router.delete('/policies/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const id = req.params['id'] ?? '';
     if (id === 'root') {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'Cannot delete root policy' });
@@ -220,12 +241,12 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   // -- Mute Timings
 
   // GET /api/notifications/mute-timings
-  router.get('/mute-timings', async (_req: Request, res: Response) => {
+  router.get('/mute-timings', requireDashboardRead, async (_req: Request, res: Response) => {
     res.json(await notifStore.findAllMuteTimings());
   });
 
   // POST /api/notifications/mute-timings
-  router.post('/mute-timings', async (req: Request, res: Response) => {
+  router.post('/mute-timings', requireDashboardWrite, async (req: Request, res: Response) => {
     const body = req.body as Partial<MuteTiming>;
     if (!body?.name) {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'name is required' });
@@ -241,7 +262,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // PUT /api/notifications/mute-timings/:id
-  router.put('/mute-timings/:id', async (req: Request, res: Response) => {
+  router.put('/mute-timings/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const updated = await notifStore.updateMuteTiming(
       req.params['id'] ?? '',
       req.body as Partial<Omit<MuteTiming, 'id' | 'createdAt'>>,
@@ -254,7 +275,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   });
 
   // DELETE /api/notifications/mute-timings/:id
-  router.delete('/mute-timings/:id', async (req: Request, res: Response) => {
+  router.delete('/mute-timings/:id', requireDashboardWrite, async (req: Request, res: Response) => {
     const deleted = await notifStore.deleteMuteTiming(req.params['id'] ?? '');
     if (!deleted) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Mute timing not found' });
@@ -267,7 +288,7 @@ export function createNotificationsRouter(deps: NotificationsRouterDeps = {}): R
   // -- Alert Groups
 
   // GET /api/notifications/alert-groups
-  router.get('/alert-groups', async (_req: Request, res: Response) => {
+  router.get('/alert-groups', requireDashboardRead, async (_req: Request, res: Response) => {
     const rules = await alertStore.findAll({ state: undefined });
     const activeRules = rules.list.filter((r) => r.state === 'firing' || r.state === 'pending');
 

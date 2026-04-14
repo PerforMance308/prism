@@ -1,22 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext.js';
 import Layout from './components/Layout.js';
-import Home from './pages/Home.js';
-import Feed from './pages/Feed.js';
-import Investigations from './pages/Investigations.js';
-import InvestigationDetail from './pages/InvestigationDetail.js';
-import Evidence from './pages/Evidence.js';
-import ActionCenter from './pages/ActionCenter.js';
-import PostMortem from './pages/PostMortem.js';
-import SetupWizard from './pages/SetupWizard.js';
-import Settings from './pages/Settings.js';
-import Login from './pages/Login.js';
-import Admin from './pages/Admin.js';
-import Dashboards from './pages/Dashboards.js';
-import DashboardWorkspace from './pages/DashboardWorkspace.js';
-import Alerts from './pages/Alerts.js';
+import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { apiClient } from './api/client.js';
+
+const Home = lazy(() => import('./pages/Home.js'));
+const Feed = lazy(() => import('./pages/Feed.js'));
+const Investigations = lazy(() => import('./pages/Investigations.js'));
+const InvestigationDetail = lazy(() => import('./pages/InvestigationDetail.js'));
+const Evidence = lazy(() => import('./pages/Evidence.js'));
+const ActionCenter = lazy(() => import('./pages/ActionCenter.js'));
+const PostMortem = lazy(() => import('./pages/PostMortem.js'));
+const SetupWizard = lazy(() => import('./pages/SetupWizard.js'));
+const Settings = lazy(() => import('./pages/Settings.js'));
+const Login = lazy(() => import('./pages/Login.js'));
+const Admin = lazy(() => import('./pages/Admin.js'));
+const Dashboards = lazy(() => import('./pages/Dashboards.js'));
+const DashboardWorkspace = lazy(() => import('./pages/DashboardWorkspace.js'));
+const Alerts = lazy(() => import('./pages/Alerts.js'));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-surface-container">
+      <span className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-outline border-t-primary" />
+    </div>
+  );
+}
 
 // Redirect to /setup on first visit if not yet configured
 function SetupGuard({ children }: { children: React.ReactNode }) {
@@ -56,40 +66,44 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <SetupGuard>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/login/callback" element={<Login />} />
-            <Route path="/setup" element={<SetupWizard />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<Home />} />
-              <Route path="/feed" element={<Feed />} />
-              <Route path="/investigations" element={<Investigations />} />
-              <Route path="/investigations/:id" element={<InvestigationDetail />} />
-              <Route path="/investigate" element={<Navigate to="/investigations" replace />} />
-              <Route path="/investigate/:id" element={<Navigate to="/investigations" replace />} />
-              <Route path="/evidence/:id" element={<Evidence />} />
-              <Route path="/actions" element={<ActionCenter />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/admin" element={<Admin />} />
-              <Route path="/incidents/:id/post-mortem" element={<PostMortem />} />
-              <Route path="/dashboards" element={<Dashboards />} />
-              <Route path="/dashboards/:id" element={<DashboardWorkspace />} />
-              <Route path="/alerts" element={<Alerts />} />
-              <Route path="/connections" element={<Navigate to="/settings" replace />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </SetupGuard>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <Suspense fallback={<RouteFallback />}>
+            <SetupGuard>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/login/callback" element={<Login />} />
+                <Route path="/setup" element={<SetupWizard />} />
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <Layout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/" element={<Home />} />
+                  <Route path="/feed" element={<Feed />} />
+                  <Route path="/investigations" element={<Investigations />} />
+                  <Route path="/investigations/:id" element={<InvestigationDetail />} />
+                  <Route path="/investigate" element={<Navigate to="/investigations" replace />} />
+                  <Route path="/investigate/:id" element={<Navigate to="/investigations" replace />} />
+                  <Route path="/evidence/:id" element={<Evidence />} />
+                  <Route path="/actions" element={<ActionCenter />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/admin" element={<Admin />} />
+                  <Route path="/incidents/:id/post-mortem" element={<PostMortem />} />
+                  <Route path="/dashboards" element={<Dashboards />} />
+                  <Route path="/dashboards/:id" element={<DashboardWorkspace />} />
+                  <Route path="/alerts" element={<Alerts />} />
+                  <Route path="/connections" element={<Navigate to="/settings" replace />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Route>
+              </Routes>
+            </SetupGuard>
+          </Suspense>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

@@ -23,7 +23,8 @@ proactive:
   historySize: 100
 
 security:
-  jwtSecret: change-me-in-production-must-be-32-chars!!
+  # jwtSecret must be provided via JWT_SECRET env var (min 32 chars).
+  # No default is set here on purpose — the app will refuse to start otherwise.
   apiKeyHeader: x-api-key
   sessionTtl: 86400
 

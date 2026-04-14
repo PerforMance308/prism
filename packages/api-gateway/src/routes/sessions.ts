@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import type { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
 import { SessionStore } from '@agentic-obs/data-layer';
-import type { Session } from '@agentic-obs/data-layer'; // used in update body type
+import type { Session } from '@agentic-obs/data-layer';
 import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
 
 export const sessionsRouter = Router();
 const store = new SessionStore();
@@ -10,27 +11,27 @@ const store = new SessionStore();
 // All session routes require auth
 sessionsRouter.use(authMiddleware);
 
-// POST /sessions - create session
-sessionsRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
+// POST /sessions - create session (always for the authenticated user)
+sessionsRouter.post('/', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const body = req.body as { userId?: unknown };
-    if (!body.userId || typeof body.userId !== 'string') {
-      res.status(400).json({ code: 'INVALID_INPUT', message: 'userId is required' });
+    const userId = req.auth?.sub;
+    if (!userId) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' });
       return;
     }
-    const session = store.create(body.userId);
+    const session = store.create(userId);
     res.status(201).json(session);
   } catch (err) {
     next(err);
   }
 });
 
-// GET /sessions?userId=... - list sessions by userId (userId is required)
-sessionsRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
+// GET /sessions - list sessions for the authenticated user
+sessionsRouter.get('/', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const userId = req.query['userId'];
-    if (!userId || typeof userId !== 'string') {
-      res.status(400).json({ code: 'INVALID_INPUT', message: 'userId query param is required' });
+    const userId = req.auth?.sub;
+    if (!userId) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' });
       return;
     }
     const sessions = store.listByUser(userId);
@@ -40,12 +41,22 @@ sessionsRouter.get('/', (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// GET /sessions/:id - get session by id
-sessionsRouter.get('/:id', (req: Request, res: Response, next: NextFunction) => {
+// GET /sessions/:id - get session by id (ownership check)
+sessionsRouter.get('/:id', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const userId = req.auth?.sub;
+    if (!userId) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' });
+      return;
+    }
+
     const session = store.get(req.params['id'] ?? '');
     if (!session) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Session not found' });
+      return;
+    }
+    if (session.userId !== userId) {
+      res.status(403).json({ code: 'FORBIDDEN', message: 'you do not own this session' });
       return;
     }
     res.json(session);
@@ -54,13 +65,23 @@ sessionsRouter.get('/:id', (req: Request, res: Response, next: NextFunction) => 
   }
 });
 
-// PATCH /sessions/:id - update session
-sessionsRouter.patch('/:id', (req: Request, res: Response, next: NextFunction) => {
+// PATCH /sessions/:id - update session (ownership check)
+sessionsRouter.patch('/:id', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const userId = req.auth?.sub;
+    if (!userId) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' });
+      return;
+    }
+
     const id = req.params['id'] ?? '';
     const existing = store.get(id);
     if (!existing) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Session not found' });
+      return;
+    }
+    if (existing.userId !== userId) {
+      res.status(403).json({ code: 'FORBIDDEN', message: 'you do not own this session' });
       return;
     }
 
@@ -71,13 +92,23 @@ sessionsRouter.patch('/:id', (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-// DELETE /sessions/:id - delete session
-sessionsRouter.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
+// DELETE /sessions/:id - delete session (ownership check)
+sessionsRouter.delete('/:id', (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
+    const userId = req.auth?.sub;
+    if (!userId) {
+      res.status(401).json({ code: 'UNAUTHORIZED', message: 'authentication required' });
+      return;
+    }
+
     const id = req.params['id'] ?? '';
     const existing = store.get(id);
     if (!existing) {
       res.status(404).json({ code: 'NOT_FOUND', message: 'Session not found' });
+      return;
+    }
+    if (existing.userId !== userId) {
+      res.status(403).json({ code: 'FORBIDDEN', message: 'you do not own this session' });
       return;
     }
 

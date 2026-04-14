@@ -42,7 +42,7 @@ export function generateScaffold(options: ScaffoldOptions): ScaffoldFile[] {
         },
         dependencies: {
           '@agentic-obs/adapter-sdk': '*',
-          '@agentic-obs/agent-core': '*',
+          '@agentic-obs/common': '*',
         },
         devDependencies: {
           typescript: '^5.4.0',
@@ -97,7 +97,7 @@ export function generateScaffold(options: ScaffoldOptions): ScaffoldFile[] {
     {
       path: `src/${name}-adapter.ts`,
       content: `import { BaseAdapter } from '@agentic-obs/adapter-sdk';
-import type { AdapterAction, ExecutionResult } from '@agentic-obs/agent-core';
+import type { AdapterAction, ExecutionResult } from '@agentic-obs/common';
 import type { AdapterManifest } from '@agentic-obs/adapter-sdk';
 import manifest from '../manifest.json' assert { type: 'json' };
 
@@ -119,18 +119,9 @@ export class ${className} extends BaseAdapter {
   }
 
   protected async doExecute(action: AdapterAction): Promise<ExecutionResult> {
-    const executionId = this.generateExecutionId();
-
-    // TODO: Implement actual execution against ${name} API
-    // Example: call this.config.apiUrl with action.params
-    console.log(\`Executing \${action.type} on \${action.targetService} via ${name}\`);
-
-    return {
-      success: true,
-      output: { actionType: action.type, targetService: action.targetService },
-      rollbackable: false,
-      executionId,
-    };
+    // Implement execution against the ${name} API.
+    // Use this.config.apiUrl and action.params to build the request.
+    throw new Error(\`${className}.doExecute() is not implemented — wire up the ${name} API here.\`);
   }
 }`,
     },

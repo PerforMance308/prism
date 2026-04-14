@@ -3,6 +3,9 @@ import type { Request, Response, NextFunction } from 'express';
 import { getSetupConfig } from './setup.js';
 import type { IGatewayDashboardStore } from '../repositories/types.js';
 import type { IAlertRuleRepository, IGatewayInvestigationStore, IGatewayFeedStore, IInvestigationReportRepository } from '@agentic-obs/data-layer';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
 import { IntentService } from '../services/intent-service.js';
 
 // SSE-streaming intent endpoint.
@@ -32,7 +35,13 @@ export function createIntentRouter(deps: IntentRouterDeps): Router {
     reportStore: deps.reportStore,
   });
 
-  router.post('/', async (req: Request, res: Response, _next: NextFunction) => {
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req as AuthenticatedRequest, res, next);
+  });
+
+  router.post('/', (req: Request, res: Response, next: NextFunction) => {
+    requirePermission('dashboard:write')(req as AuthenticatedRequest, res, next);
+  }, async (req: Request, res: Response, _next: NextFunction) => {
     const body = req.body as { message?: string };
     if (!body?.message || typeof body.message !== 'string' || body.message.trim() === '') {
       res.status(400).json({ code: 'INVALID_INPUT', message: 'message is required' });

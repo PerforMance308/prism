@@ -10,7 +10,6 @@ export * from './execution/index.js';
 export * from './proactive/index.js';
 export * from './case-library/index.js';
 export * from './postmortem/index.js';
-export * from './scheduled/index.js';
 export * from './alerting/index.js';
 export * from './runtime/index.js';
 export * from './verification/index.js';
@@ -51,6 +50,7 @@ export {
   type IConversationStore as IDashboardConversationStore,
   type IInvestigationReportStore,
   type IAlertRuleStore as IDashboardAlertRuleStore,
+  type IInvestigationStore as IDashboardInvestigationStore,
   type DatasourceConfig as DashboardDatasourceConfig,
   type DashboardPlan,
   type PanelGroup,

@@ -20,9 +20,5 @@ export interface VerificationReport {
 }
 
 export interface VerificationContext {
-  /** @deprecated Use metricsAdapter instead */
-  prometheusUrl?: string;
-  /** @deprecated Use metricsAdapter instead */
-  prometheusHeaders?: Record<string, string>;
   metricsAdapter?: IMetricsAdapter;
 }

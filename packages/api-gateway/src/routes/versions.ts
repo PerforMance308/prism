@@ -1,7 +1,10 @@
 import { Router } from 'express';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { AssetType } from '@agentic-obs/common';
 import type { IVersionRepository } from '@agentic-obs/data-layer';
+import { authMiddleware } from '../middleware/auth.js';
+import type { AuthenticatedRequest } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/rbac.js';
 
 const VALID_ASSET_TYPES: AssetType[] = ['dashboard', 'alert_rule', 'investigation_report'];
 
@@ -11,9 +14,19 @@ function isValidAssetType(value: string): value is AssetType {
 
 export function createVersionRouter(store: IVersionRepository): Router {
   const router = Router();
+  const requireDashboardRead = (req: Request, res: Response, next: NextFunction): void => {
+    requirePermission('dashboard:read')(req as AuthenticatedRequest, res, next);
+  };
+  const requireDashboardWrite = (req: Request, res: Response, next: NextFunction): void => {
+    requirePermission('dashboard:write')(req as AuthenticatedRequest, res, next);
+  };
+
+  router.use((req: Request, res: Response, next: NextFunction) => {
+    authMiddleware(req as AuthenticatedRequest, res, next);
+  });
 
   // GET /api/versions/:assetType/:assetId - list version history
-  router.get('/:assetType/:assetId', async (req: Request, res: Response) => {
+  router.get('/:assetType/:assetId', requireDashboardRead, async (req: Request, res: Response) => {
     const assetType = req.params['assetType'] as string;
     const assetId = req.params['assetId'] as string;
     if (!isValidAssetType(assetType)) {
@@ -24,8 +37,29 @@ export function createVersionRouter(store: IVersionRepository): Router {
     res.json({ versions: history });
   });
 
+  // POST /api/versions/:assetType/:assetId/rollback - rollback to a version
+  router.post('/:assetType/:assetId/rollback', requireDashboardWrite, async (req: Request, res: Response) => {
+    const assetType = req.params['assetType'] as string;
+    const assetId = req.params['assetId'] as string;
+    if (!isValidAssetType(assetType)) {
+      res.status(400).json({ code: 'INVALID_ASSET_TYPE', message: `Invalid asset type: ${assetType}` });
+      return;
+    }
+    const body = req.body as { version?: number };
+    if (typeof body?.version !== 'number' || body.version < 1) {
+      res.status(400).json({ code: 'INVALID_VERSION', message: 'body.version must be a positive integer' });
+      return;
+    }
+    const snapshot = await store.rollback(assetType, assetId, body.version);
+    if (snapshot === undefined) {
+      res.status(404).json({ code: 'NOT_FOUND', message: 'Version not found' });
+      return;
+    }
+    res.json({ snapshot });
+  });
+
   // GET /api/versions/:assetType/:assetId/:version - get specific version
-  router.get('/:assetType/:assetId/:version', async (req: Request, res: Response) => {
+  router.get('/:assetType/:assetId/:version', requireDashboardRead, async (req: Request, res: Response) => {
     const assetType = req.params['assetType'] as string;
     const assetId = req.params['assetId'] as string;
     const versionStr = req.params['version'] as string;
@@ -44,27 +78,6 @@ export function createVersionRouter(store: IVersionRepository): Router {
       return;
     }
     res.json(entry);
-  });
-
-  // POST /api/versions/:assetType/:assetId/rollback - rollback to a version
-  router.post('/:assetType/:assetId/rollback', async (req: Request, res: Response) => {
-    const assetType = req.params['assetType'] as string;
-    const assetId = req.params['assetId'] as string;
-    if (!isValidAssetType(assetType)) {
-      res.status(400).json({ code: 'INVALID_ASSET_TYPE', message: `Invalid asset type: ${assetType}` });
-      return;
-    }
-    const body = req.body as { version?: number };
-    if (typeof body?.version !== 'number' || body.version < 1) {
-      res.status(400).json({ code: 'INVALID_VERSION', message: 'body.version must be a positive integer' });
-      return;
-    }
-    const snapshot = await store.rollback(assetType, assetId, body.version);
-    if (snapshot === undefined) {
-      res.status(404).json({ code: 'NOT_FOUND', message: 'Version not found' });
-      return;
-    }
-    res.json({ snapshot });
   });
 
   return router;

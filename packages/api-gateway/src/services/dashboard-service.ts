@@ -8,8 +8,24 @@ import type { IInvestigationReportRepository, IAlertRuleRepository, IGatewayInve
 import { getSetupConfig, type DatasourceConfig } from '../routes/setup.js';
 import { createLlmGateway } from '../routes/llm-factory.js';
 import { DashboardOrchestratorAgent as OrchestratorAgent } from '@agentic-obs/agent-core';
-import type { IDashboardAlertRuleStore as IAlertRuleStore } from '@agentic-obs/agent-core';
+import type { IDashboardAlertRuleStore as IAlertRuleStore, IDashboardInvestigationStore as IInvestigationStore } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
+
+/** Adapts data-layer IAlertRuleRepository to agent-core IAlertRuleStore. */
+function toAlertRuleStore(repo: IAlertRuleRepository): IAlertRuleStore {
+  return {
+    create: (data) => repo.create(data as Parameters<IAlertRuleRepository['create']>[0]),
+    update: repo.update ? (id, patch) => repo.update(id, patch as Parameters<IAlertRuleRepository['update']>[1]) : undefined,
+    findAll: repo.findAll
+      ? async () => {
+          const result = await repo.findAll();
+          return 'list' in result ? result.list : result;
+        }
+      : undefined,
+    findById: repo.findById ? (id) => repo.findById(id) : undefined,
+    delete: repo.delete ? (id) => repo.delete(id) : undefined,
+  };
+}
 
 // -- Prometheus resolution (shared across services)
 
@@ -131,8 +147,8 @@ export class DashboardService {
       store: this.store,
       conversationStore: this.conversationStore,
       investigationReportStore: this.investigationReportStore,
-      investigationStore: this.investigationStore as any,
-      alertRuleStore: this.alertRuleStore as unknown as IAlertRuleStore,
+      investigationStore: this.investigationStore as IInvestigationStore | undefined,
+      alertRuleStore: toAlertRuleStore(this.alertRuleStore),
       metricsAdapter,
       allDatasources: config.datasources,
       sendEvent,
@@ -148,7 +164,7 @@ export class DashboardService {
     log.info({ dashboardId, reply: replyContent.slice(0, 100) }, 'orchestrator done');
 
     // Mark dashboard as ready (stops frontend polling)
-    await this.store.update(dashboardId, { status: 'ready' } as any);
+    await this.store.updateStatus(dashboardId, 'ready');
 
     // Save assistant message
     const assistantMessageId = randomUUID();

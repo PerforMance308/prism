@@ -1,6 +1,6 @@
 // EvidenceAgent - binds investigation step findings to hypotheses as evidence chains
 
-import { createLogger } from '@agentic-obs/common';
+import { createLogger, getErrorMessage } from '@agentic-obs/common';
 import type { Evidence, Hypothesis } from '@agentic-obs/common';
 
 const log = createLogger('evidence-agent');
@@ -30,7 +30,7 @@ export class EvidenceAgent implements Agent<EvidenceInput, EvidenceOutput> {
     } catch (err) {
       return {
         success: false,
-        error: `EvidenceAgent failed: ${err instanceof Error ? err.message : String(err)}`,
+        error: `EvidenceAgent failed: ${getErrorMessage(err)}`,
       };
     }
   }

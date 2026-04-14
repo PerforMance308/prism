@@ -262,8 +262,6 @@ Return JSON only:
         goal,
         existingPanels: dashboard.panels,
         existingVariables: dashboard.variables,
-        availableMetrics: [],
-        labelsByMetric: {},
         gridNextRow,
       })
       return {

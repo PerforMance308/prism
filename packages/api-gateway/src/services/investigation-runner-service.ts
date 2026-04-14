@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { createLogger } from '@agentic-obs/common';
+import { createLogger, getErrorMessage } from '@agentic-obs/common';
 import type { Evidence, Hypothesis } from '@agentic-obs/common';
 
 const log = createLogger('investigation-runner');
@@ -128,7 +128,7 @@ export class LiveOrchestratorRunner implements OrchestratorRunner {
         investigationId,
       );
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
+      const errorMsg = getErrorMessage(err);
       log.error({ investigationId, error: errorMsg }, 'investigation failed');
 
       const conclusion: ExplanationResult = {

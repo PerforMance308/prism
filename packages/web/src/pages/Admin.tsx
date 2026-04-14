@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.js';
+import { api } from '../api/client.js';
 
 // Types
 
@@ -55,33 +56,6 @@ const PROVIDER_LABELS: Record<string, string> = {
   saml: 'SAML',
 };
 
-// API helpers
-
-async function apiFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  const token = (() => {
-    try {
-      const raw = localStorage.getItem('agentic_obs_auth');
-      if (raw) return (JSON.parse(raw) as { tokens?: { accessToken?: string } }).tokens?.accessToken;
-    } catch {
-      return null;
-    }
-    return null;
-  })();
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText })) as { message?: string };
-    throw new Error(err.message ?? res.statusText);
-  }
-  return res.json() as Promise<T>;
-}
-
 // Users Tab
 
 function UsersTab() {
@@ -94,7 +68,7 @@ function UsersTab() {
 
   const load = useCallback(async () => {
     try {
-      const data = await apiFetch<{ users: User[] }>('/api/admin/users');
+      const data = await api.get<{ users: User[] }>('/admin/users');
       setUsers(data.users);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load users');
@@ -107,10 +81,7 @@ function UsersTab() {
 
   const handleRoleChange = async (userId: string, role: string) => {
     try {
-      await apiFetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ role }),
-      });
+      await api.patch(`/admin/users/${userId}`, { role });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update role');
@@ -119,10 +90,7 @@ function UsersTab() {
 
   const handleToggleDisable = async (user: User) => {
     try {
-      await apiFetch(`/api/admin/users/${user.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ disabled: !user.disabled }),
-      });
+      await api.patch(`/admin/users/${user.id}`, { disabled: !user.disabled });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to update user');
@@ -132,7 +100,7 @@ function UsersTab() {
   const handleDelete = async (userId: string) => {
     if (!confirm('Delete this user? This action cannot be undone.')) return;
     try {
-      await apiFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      await api.delete(`/admin/users/${userId}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete user');
@@ -142,10 +110,7 @@ function UsersTab() {
   const handleInvite = async () => {
     setSaving(true);
     try {
-      await apiFetch('/api/admin/users', {
-        method: 'POST',
-        body: JSON.stringify(invite),
-      });
+      await api.post('/admin/users', invite);
       setInviteOpen(false);
       setInvite({ email: '', name: '', role: 'viewer', password: '' });
       await load();
@@ -313,8 +278,8 @@ function TeamsTab() {
   const load = useCallback(async () => {
     try {
       const [data, users] = await Promise.all([
-        apiFetch<{ teams: Team[] }>('/api/admin/teams'),
-        apiFetch<{ users: User[] }>('/api/admin/users'),
+        api.get<{ teams: Team[] }>('/admin/teams'),
+        api.get<{ users: User[] }>('/admin/users'),
       ]);
       setTeams(data.teams);
       setUsers(users.users);
@@ -331,7 +296,7 @@ function TeamsTab() {
     if (!newTeamName.trim()) return;
     setSaving(true);
     try {
-      await apiFetch('/api/admin/teams', { method: 'POST', body: JSON.stringify({ name: newTeamName }) });
+      await api.post('/admin/teams', { name: newTeamName });
       setCreating(false);
       setNewTeamName('');
       await load();
@@ -345,7 +310,7 @@ function TeamsTab() {
   const handleDelete = async (teamId: string) => {
     if (!confirm('Delete this team?')) return;
     try {
-      await apiFetch(`/api/admin/teams/${teamId}`, { method: 'DELETE' });
+      await api.delete(`/admin/teams/${teamId}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete team');
@@ -354,10 +319,7 @@ function TeamsTab() {
 
   const handleAddMember = async (teamId: string, userId: string) => {
     try {
-      await apiFetch(`/api/admin/teams/${teamId}/members`, {
-        method: 'POST',
-        body: JSON.stringify({ userId, role: 'member' }),
-      });
+      await api.post(`/admin/teams/${teamId}/members`, { userId, role: 'member' });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add member');
@@ -366,7 +328,7 @@ function TeamsTab() {
 
   const handleRemoveMember = async (teamId: string, userId: string) => {
     try {
-      await apiFetch(`/api/admin/teams/${teamId}/members/${userId}`, { method: 'DELETE' });
+      await api.delete(`/admin/teams/${teamId}/members/${userId}`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove member');
@@ -480,8 +442,8 @@ function AuditLogTab() {
 
   const load = useCallback(async (off: number) => {
     try {
-      const data = await apiFetch<{ entries: AuditEntry[]; total: number }>(
-        `/api/admin/audit-log?limit=${LIMIT}&offset=${off}`,
+      const data = await api.get<{ entries: AuditEntry[]; total: number }>(
+        `/admin/audit-log?limit=${LIMIT}&offset=${off}`,
       );
       setEntries(data.entries);
       setTotal(data.total);
