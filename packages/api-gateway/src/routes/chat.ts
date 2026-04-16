@@ -22,6 +22,7 @@ async function handleChatStream(
   res: Response,
   message: string,
   sessionId: string | undefined,
+  pageContext: { kind: string; id?: string } | undefined,
   deps: ChatServiceDeps,
 ): Promise<void> {
   res.writeHead(200, {
@@ -44,6 +45,7 @@ async function handleChatStream(
       message,
       sessionId,
       (event) => { if (!closed) sendSseEvent(res, event); },
+      pageContext,
     );
 
     if (!closed) {
@@ -51,6 +53,7 @@ async function handleChatStream(
         type: 'done',
         messageId: result.assistantMessageId,
         sessionId: result.sessionId,
+        ...(result.navigate ? { navigate: result.navigate } : {}),
       } as DashboardSseEvent & { sessionId: string });
     }
   } catch (err) {
@@ -73,7 +76,7 @@ export function createChatRouter(deps: ChatServiceDeps): ExpressRouter {
   // POST /chat — unified session-based chat endpoint (SSE streaming)
   router.post('/', requirePermission('dashboard:write'), async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const body = req.body as { message?: string; sessionId?: string };
+      const body = req.body as { message?: string; sessionId?: string; pageContext?: { kind: string; id?: string } };
       if (typeof body.message !== 'string' || body.message.trim() === '') {
         res.status(400).json({ code: 'INVALID_INPUT', message: 'message is required and must be a non-empty string' });
         return;
@@ -83,14 +86,52 @@ export function createChatRouter(deps: ChatServiceDeps): ExpressRouter {
       const sessionId = typeof body.sessionId === 'string' && body.sessionId.trim()
         ? body.sessionId.trim()
         : undefined;
+      const pageContext = body.pageContext ?? undefined;
 
-      await handleChatStream(req, res, message, sessionId, deps);
+      await handleChatStream(req, res, message, sessionId, pageContext, deps);
     } catch (err) {
       next(err);
     }
   });
 
-  // GET /chat/:sessionId — retrieve conversation history for a session
+  // GET /chat/sessions — list recent chat sessions
+  router.get('/sessions', requirePermission('dashboard:read'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!deps.chatSessionStore) {
+        res.json({ sessions: [] });
+        return;
+      }
+      const limit = Math.min(Number(req.query['limit']) || 50, 200);
+      const sessions = await deps.chatSessionStore.findAll(limit);
+      res.json({ sessions });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // GET /chat/sessions/:id/messages — get messages for a session
+  router.get('/sessions/:id/messages', requirePermission('dashboard:read'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.params['id'] ?? '';
+      if (!sessionId) {
+        res.status(400).json({ code: 'INVALID_INPUT', message: 'session id is required' });
+        return;
+      }
+
+      if (deps.chatMessageStore) {
+        const messages = await deps.chatMessageStore.getMessages(sessionId);
+        res.json({ sessionId, messages });
+      } else {
+        // Fallback to conversationStore
+        const messages = await deps.conversationStore.getMessages(sessionId);
+        res.json({ sessionId, messages });
+      }
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // GET /chat/:sessionId — retrieve conversation history for a session (legacy)
   router.get('/:sessionId', requirePermission('dashboard:read'), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const sessionId = req.params['sessionId'] ?? '';
@@ -99,8 +140,13 @@ export function createChatRouter(deps: ChatServiceDeps): ExpressRouter {
         return;
       }
 
-      const messages = await deps.conversationStore.getMessages(sessionId);
-      res.json({ sessionId, messages });
+      if (deps.chatMessageStore) {
+        const messages = await deps.chatMessageStore.getMessages(sessionId);
+        res.json({ sessionId, messages });
+      } else {
+        const messages = await deps.conversationStore.getMessages(sessionId);
+        res.json({ sessionId, messages });
+      }
     } catch (err) {
       next(err);
     }

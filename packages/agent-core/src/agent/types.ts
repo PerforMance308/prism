@@ -111,6 +111,7 @@ export interface IDashboardAgentStore {
     useExistingMetrics?: boolean
     folder?: string
     workspaceId?: string
+    sessionId?: string
   }): import('@agentic-obs/common').Dashboard | Promise<import('@agentic-obs/common').Dashboard>
   findById(id: string): import('@agentic-obs/common').Dashboard | Promise<import('@agentic-obs/common').Dashboard | undefined> | undefined
   update(id: string, patch: Partial<Pick<import('@agentic-obs/common').Dashboard, 'type' | 'title' | 'description' | 'panels' | 'variables' | 'refreshIntervalSec' | 'folder'>>): unknown

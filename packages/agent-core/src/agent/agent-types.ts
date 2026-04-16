@@ -11,6 +11,8 @@ export type AgentToolName =
   | 'dashboard.rearrange' | 'dashboard.add_variable' | 'dashboard.set_title'
   // Investigation lifecycle
   | 'investigation.create'
+  | 'investigation.add_section'
+  | 'investigation.complete'
   // Alert rule management
   | 'create_alert_rule' | 'modify_alert_rule' | 'delete_alert_rule'
   // Prometheus primitives

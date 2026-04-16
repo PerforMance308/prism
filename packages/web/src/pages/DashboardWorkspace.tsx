@@ -118,6 +118,14 @@ export default function DashboardWorkspace() {
   const [showReport, setShowReport] = useState(false);
   const globalChat = useGlobalChat();
 
+  // Tell the global chat which dashboard the user is viewing + current time range
+  useEffect(() => {
+    if (id) {
+      globalChat.setPageContext({ kind: 'dashboard', id, timeRange });
+    }
+    return () => { globalChat.setPageContext(null); };
+  }, [id, timeRange, globalChat]);
+
   // Investigation reports are now handled in the Investigations page.
   // No auto-show on dashboard — the chat will display a link instead.
 

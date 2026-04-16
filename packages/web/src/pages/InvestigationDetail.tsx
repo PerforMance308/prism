@@ -502,12 +502,7 @@ export default function InvestigationDetail() {
           </div>
         </div>
 
-        {/* Right: Chat panel */}
-        <ChatPanel
-          events={chatEvents}
-          isGenerating={isGenerating}
-          onSendMessage={(msg) => { void handleSendMessage(msg); }}
-        />
+        {/* Chat is now in the global Layout — no embedded ChatPanel here */}
       </div>
     </div>
   );

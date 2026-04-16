@@ -25,6 +25,8 @@ import type {
   EditSource,
   SavedInvestigationReport,
   PostMortemReport,
+  ChatSession,
+  ChatMessage,
 } from '@agentic-obs/common';
 import type { ExplanationResult } from '@agentic-obs/common';
 import type { FeedEvent, Case, ApprovalRecord, ShareLink } from './types.js';
@@ -228,6 +230,7 @@ export interface IDashboardRepository {
     useExistingMetrics?: boolean;
     folder?: string;
     workspaceId?: string;
+    sessionId?: string;
   }): MaybeAsync<Dashboard>;
   findById(id: string): MaybeAsync<Dashboard | undefined>;
   findAll(userId?: string): MaybeAsync<Dashboard[]>;
@@ -384,4 +387,23 @@ export interface IPostMortemRepository {
   set(incidentId: string, report: PostMortemReport): MaybeAsync<void>;
   get(incidentId: string): MaybeAsync<PostMortemReport | undefined>;
   has(incidentId: string): MaybeAsync<boolean>;
+}
+
+// — ChatSession
+
+export interface IChatSessionRepository {
+  create(session: { id: string; title?: string }): MaybeAsync<ChatSession>;
+  findById(id: string): MaybeAsync<ChatSession | undefined>;
+  findAll(limit?: number): MaybeAsync<ChatSession[]>;
+  updateTitle(id: string, title: string): MaybeAsync<ChatSession | undefined>;
+  delete(id: string): MaybeAsync<boolean>;
+}
+
+// — ChatMessage
+
+export interface IChatMessageRepository {
+  addMessage(sessionId: string, message: { id: string; role: string; content: string; actions?: unknown; timestamp: string }): MaybeAsync<ChatMessage>;
+  getMessages(sessionId: string, limit?: number): MaybeAsync<ChatMessage[]>;
+  getMessageCount(sessionId: string): MaybeAsync<number>;
+  deleteBySession(sessionId: string): MaybeAsync<void>;
 }

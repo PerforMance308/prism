@@ -32,6 +32,8 @@ import type { ActionContext } from './orchestrator-action-handlers.js'
 import {
   handleDashboardCreate,
   handleInvestigationCreate,
+  handleInvestigationAddSection,
+  handleInvestigationComplete,
   handleCreateAlertRule,
   handleModifyAlertRule,
   handleDeleteAlertRule,
@@ -70,7 +72,7 @@ export interface OrchestratorDeps {
 const MUTATION_ACTIONS = [
   'dashboard.create', 'dashboard.add_panels', 'dashboard.remove_panels', 'dashboard.modify_panel',
   'dashboard.rearrange', 'dashboard.add_variable', 'dashboard.set_title',
-  'investigation.create',
+  'investigation.create', 'investigation.add_section', 'investigation.complete',
   'create_alert_rule', 'modify_alert_rule', 'delete_alert_rule',
 ] as const;
 
@@ -190,6 +192,7 @@ export class OrchestratorAgent {
 
     const systemPrompt = buildSystemPrompt(dashboard ?? null, history, alertRules, activeAlertRule, this.deps.allDatasources ?? [], {
       hasPrometheus: !!this.deps.metricsAdapter,
+      timeRange: this.deps.timeRange ? { start: this.deps.timeRange.start, end: this.deps.timeRange.end } : undefined,
     })
 
     try {
@@ -222,6 +225,7 @@ export class OrchestratorAgent {
       webSearchAdapter: this.deps.webSearchAdapter,
       allDatasources: this.deps.allDatasources,
       sendEvent: this.deps.sendEvent,
+      sessionId: this.sessionId,
       actionExecutor: this.actionExecutor,
       alertRuleAgent: this.alertRuleAgent,
       emitAgentEvent: (event) => this.emitAgentEvent(event),
@@ -289,6 +293,8 @@ export class OrchestratorAgent {
         case 'dashboard.add_variable': return handleDashboardAddVariable(ctx, args)
         // Investigation lifecycle
         case 'investigation.create': return handleInvestigationCreate(ctx, args)
+        case 'investigation.add_section': return handleInvestigationAddSection(ctx, args)
+        case 'investigation.complete': return handleInvestigationComplete(ctx, args)
         // Alert rules
         case 'create_alert_rule': return handleCreateAlertRule(ctx, args)
         case 'modify_alert_rule': return handleModifyAlertRule(ctx, args)

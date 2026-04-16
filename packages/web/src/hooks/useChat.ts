@@ -2,6 +2,16 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { apiClient } from '../api/client.js';
 import type { ChatMessage, ChatEvent } from './useDashboardChat.js';
 
+/** Page context — tells the agent what the user is currently looking at. */
+export interface PageContext {
+  /** e.g., "dashboard", "investigation", "alerts", "home" */
+  kind: string;
+  /** Resource ID (dashboardId, investigationId, etc.) */
+  id?: string;
+  /** Selected time range on the dashboard (e.g., "1h", "6h", "24h", "7d") */
+  timeRange?: string;
+}
+
 export interface UseChatResult {
   messages: ChatMessage[];
   events: ChatEvent[];
@@ -11,6 +21,14 @@ export interface UseChatResult {
   /** Set by the backend when the agent creates a resource and emits a navigate SSE event. */
   pendingNavigation: string | null;
   clearPendingNavigation: () => void;
+  /** Set the current page context — agent uses this to know which resource the user is viewing. */
+  setPageContext: (ctx: PageContext | null) => void;
+  /** Current session ID (readonly). */
+  currentSessionId: string;
+  /** Clear messages/events, generate a new sessionId, persist to localStorage. */
+  startNewSession: () => void;
+  /** Load a session's messages from the backend. Handles 404 gracefully. */
+  loadSession: (sessionId: string) => Promise<void>;
 }
 
 /**
@@ -22,15 +40,18 @@ export function useChat(): UseChatResult {
   const [events, setEvents] = useState<ChatEvent[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const pageContextRef = useRef<PageContext | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const sessionIdRef = useRef<string>(
-    localStorage.getItem('chat_session_id') ?? `ses_${crypto.randomUUID()}`,
+  const [currentSessionId, setCurrentSessionId] = useState<string>(
+    () => localStorage.getItem('chat_session_id') ?? `ses_${crypto.randomUUID()}`,
   );
+  const sessionIdRef = useRef<string>(currentSessionId);
 
-  // Persist sessionId
+  // Keep ref in sync with state
   useEffect(() => {
-    localStorage.setItem('chat_session_id', sessionIdRef.current);
-  }, []);
+    sessionIdRef.current = currentSessionId;
+    localStorage.setItem('chat_session_id', currentSessionId);
+  }, [currentSessionId]);
 
   const appendEvent = useCallback((evt: ChatEvent) => {
     setEvents((prev) => [...prev, evt]);
@@ -170,6 +191,7 @@ export function useChat(): UseChatResult {
           {
             message: content,
             sessionId: sessionIdRef.current,
+            ...(pageContextRef.current ? { pageContext: pageContextRef.current } : {}),
           },
           handleSSEEvent,
           abortRef.current.signal,
@@ -194,6 +216,10 @@ export function useChat(): UseChatResult {
     [isGenerating, handleSSEEvent, appendEvent],
   );
 
+  const setPageContext = useCallback((ctx: PageContext | null) => {
+    pageContextRef.current = ctx;
+  }, []);
+
   const stopGeneration = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -210,6 +236,45 @@ export function useChat(): UseChatResult {
     });
   }, [appendEvent]);
 
+  const startNewSession = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setMessages([]);
+    setEvents([]);
+    setIsGenerating(false);
+    setPendingNavigation(null);
+    const newId = `ses_${crypto.randomUUID()}`;
+    setCurrentSessionId(newId);
+  }, []);
+
+  const loadSession = useCallback(async (sessionId: string) => {
+    // Switch to the requested session
+    setCurrentSessionId(sessionId);
+    setMessages([]);
+    setEvents([]);
+    setIsGenerating(false);
+    setPendingNavigation(null);
+
+    try {
+      const res = await apiClient.get<{ sessionId: string; messages: ChatMessage[] }>(
+        `/chat/sessions/${sessionId}/messages`,
+      );
+      if (res.error || !res.data?.messages) return;
+
+      const loaded = res.data.messages;
+      setMessages(loaded);
+      // Rebuild events from loaded messages so the UI renders them
+      const rebuilt: ChatEvent[] = loaded.map((msg) => ({
+        id: msg.id,
+        kind: 'message' as const,
+        message: msg,
+      }));
+      setEvents(rebuilt);
+    } catch {
+      // Backend may not exist yet (Phase 1) — silently ignore 404s and network errors
+    }
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -225,5 +290,9 @@ export function useChat(): UseChatResult {
     stopGeneration,
     pendingNavigation,
     clearPendingNavigation,
+    setPageContext,
+    currentSessionId,
+    startNewSession,
+    loadSession,
   };
 }

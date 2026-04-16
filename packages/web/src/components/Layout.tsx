@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Navigation from './Navigation.js';
 import GlobalSearch from './GlobalSearch.js';
 import ChatPanel from './ChatPanel.js';
@@ -7,7 +7,10 @@ import { ChatProvider, useGlobalChat } from '../contexts/ChatContext.js';
 
 function LayoutInner() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { events, isGenerating, sendMessage, stopGeneration, pendingNavigation, clearPendingNavigation } = useGlobalChat();
+
+  const isHome = location.pathname === '/';
 
   // Handle agent-initiated navigation
   useEffect(() => {
@@ -23,14 +26,16 @@ function LayoutInner() {
       <main className="flex-1 overflow-y-auto bg-surface-container">
         <Outlet />
       </main>
-      <ChatPanel
-        events={events}
-        isGenerating={isGenerating}
-        onSendMessage={(msg) => {
-          void sendMessage(msg);
-        }}
-        onStop={stopGeneration}
-      />
+      {!isHome && (
+        <ChatPanel
+          events={events}
+          isGenerating={isGenerating}
+          onSendMessage={(msg) => {
+            void sendMessage(msg);
+          }}
+          onStop={stopGeneration}
+        />
+      )}
       <GlobalSearch />
     </div>
   );

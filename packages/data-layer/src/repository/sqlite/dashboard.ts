@@ -33,6 +33,7 @@ function rowToDashboard(row: DbRow): Dashboard {
     useExistingMetrics: row.useExistingMetrics,
     folder: row.folder ?? undefined,
     workspaceId: row.workspaceId ?? undefined,
+    sessionId: row.sessionId ?? undefined,
     version: row.version ?? undefined,
     publishStatus: (row.publishStatus as PublishStatus) ?? undefined,
     error: row.error ?? undefined,
@@ -53,6 +54,7 @@ export class SqliteDashboardRepository implements IDashboardRepository {
     useExistingMetrics?: boolean;
     folder?: string;
     workspaceId?: string;
+    sessionId?: string;
   }): Promise<Dashboard> {
     const now = new Date().toISOString();
     const id = uid();
@@ -73,6 +75,7 @@ export class SqliteDashboardRepository implements IDashboardRepository {
         useExistingMetrics: params.useExistingMetrics ?? true,
         folder: params.folder ?? null,
         workspaceId: params.workspaceId ?? null,
+        sessionId: params.sessionId ?? null,
         createdAt: now,
         updatedAt: now,
       })

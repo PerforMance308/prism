@@ -8,7 +8,7 @@ import type { DashboardSseEvent } from '@agentic-obs/common'
 
 const log = createLogger('react-loop')
 
-const MAX_ITERATIONS = 15
+const MAX_ITERATIONS = 30
 /** Keep the last N observations in full; older ones are summarized to save context. */
 const OBSERVATION_KEEP_RECENT = 6
 /** Truncate individual observation text to this many characters. */
@@ -91,7 +91,7 @@ export class ReActLoop {
       try {
         const resp = await this.deps.gateway.complete(messages, {
           model: this.deps.model,
-          maxTokens: 2048,
+          maxTokens: 4096,
           temperature: 0,
           responseFormat: 'json',
         })

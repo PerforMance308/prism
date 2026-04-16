@@ -197,6 +197,7 @@ export const dashboards = sqliteTable(
     useExistingMetrics: integer('use_existing_metrics', { mode: 'boolean' }).notNull().default(true),
     folder: text('folder'),
     workspaceId: text('workspace_id'),
+    sessionId: text('session_id'),
     version: integer('version'),
     publishStatus: text('publish_status'),
     error: text('error'),
@@ -206,6 +207,7 @@ export const dashboards = sqliteTable(
   (t) => [
     index('dashboards_user_idx').on(t.userId),
     index('dashboards_workspace_idx').on(t.workspaceId),
+    index('dashboards_session_idx').on(t.sessionId),
     index('dashboards_status_idx').on(t.status),
     index('dashboards_created_at_idx').on(t.createdAt),
   ],
@@ -473,5 +475,38 @@ export const investigationReports = sqliteTable(
   },
   (t) => [
     index('investigation_reports_dashboard_idx').on(t.dashboardId),
+  ],
+);
+
+// — chat sessions
+
+export const chatSessions = sqliteTable(
+  'chat_sessions',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull().default(''),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (t) => [
+    index('chat_sessions_updated_at_idx').on(t.updatedAt),
+  ],
+);
+
+// — chat messages (session-scoped, independent of dashboards)
+
+export const chatMessages = sqliteTable(
+  'chat_messages',
+  {
+    id: text('id').primaryKey(),
+    sessionId: text('session_id').notNull(),
+    role: text('role').notNull(),
+    content: text('content').notNull(),
+    actions: text('actions', { mode: 'json' }),
+    timestamp: text('timestamp').notNull(),
+  },
+  (t) => [
+    index('chat_messages_session_idx').on(t.sessionId),
+    index('chat_messages_timestamp_idx').on(t.timestamp),
   ],
 );

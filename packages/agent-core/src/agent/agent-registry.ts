@@ -35,6 +35,8 @@ agentRegistry.register({
     'dashboard.rearrange', 'dashboard.add_variable', 'dashboard.set_title',
     // Investigation lifecycle
     'investigation.create',
+    'investigation.add_section',
+    'investigation.complete',
     // Prometheus primitives
     'prometheus.query', 'prometheus.range_query', 'prometheus.labels', 'prometheus.label_values',
     'prometheus.series', 'prometheus.metadata', 'prometheus.metric_names', 'prometheus.validate',
@@ -46,7 +48,7 @@ agentRegistry.register({
   inputKinds: ['dashboard'],
   outputKinds: ['dashboard', 'panel', 'dashboard_variable', 'investigation_report', 'alert_rule'],
   permissionMode: 'artifact_mutation',
-  maxIterations: 15,
+  maxIterations: 30,
 });
 
 agentRegistry.register({

@@ -155,9 +155,28 @@ export interface Dashboard {
   useExistingMetrics: boolean;
   folder?: string;
   workspaceId?: string;
+  sessionId?: string;
   version?: number;
   publishStatus?: PublishStatus;
   createdAt: string;
   updatedAt: string;
   error?: string;
+}
+
+// -- Chat session types
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  actions?: DashboardAction[];
+  timestamp: string;
 }

@@ -8,7 +8,7 @@ import type { IDashboardAlertRuleStore as IAlertRuleStore, IDashboardInvestigati
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
 import { resolvePrometheusDatasource } from './dashboard-service.js';
 import type { IGatewayDashboardStore, IConversationStore } from '../repositories/types.js';
-import type { IInvestigationReportRepository, IAlertRuleRepository, IGatewayInvestigationStore } from '@agentic-obs/data-layer';
+import type { IInvestigationReportRepository, IAlertRuleRepository, IGatewayInvestigationStore, IChatSessionRepository, IChatMessageRepository } from '@agentic-obs/data-layer';
 
 const log = createLogger('chat-service');
 
@@ -34,6 +34,8 @@ export interface ChatServiceDeps {
   investigationReportStore: IInvestigationReportRepository;
   alertRuleStore: IAlertRuleRepository;
   investigationStore?: IGatewayInvestigationStore;
+  chatSessionStore?: IChatSessionRepository;
+  chatMessageStore?: IChatMessageRepository;
 }
 
 export interface ChatSessionResult {
@@ -50,6 +52,7 @@ export class ChatService {
     message: string,
     sessionId: string | undefined,
     sendEvent: (event: DashboardSseEvent) => void,
+    pageContext?: { kind: string; id?: string; timeRange?: string },
   ): Promise<ChatSessionResult> {
     const config = getSetupConfig();
     if (!config.llm) {
@@ -58,6 +61,25 @@ export class ChatService {
 
     const resolvedSessionId = sessionId ?? randomUUID();
 
+    // Ensure a chat_sessions record exists for this session
+    if (this.deps.chatSessionStore) {
+      const existing = await this.deps.chatSessionStore.findById(resolvedSessionId);
+      if (!existing) {
+        await this.deps.chatSessionStore.create({ id: resolvedSessionId });
+      }
+    }
+
+    // Persist the user message to chat_messages
+    const userMsgId = randomUUID();
+    if (this.deps.chatMessageStore) {
+      await this.deps.chatMessageStore.addMessage(resolvedSessionId, {
+        id: userMsgId,
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     const gateway = createLlmGateway(config.llm);
     const model = config.llm.model;
     const prom = resolvePrometheusDatasource(config.datasources);
@@ -65,6 +87,38 @@ export class ChatService {
     const metricsAdapter = prom
       ? new PrometheusMetricsAdapter(prom.url, prom.headers)
       : undefined;
+
+    // Parse relative time range (e.g., "1h", "6h", "24h", "7d") to absolute start/end
+    let timeRange: { start: string; end: string } | undefined;
+    if (pageContext?.timeRange) {
+      const now = new Date();
+      const match = pageContext.timeRange.match(/^(\d+)([mhd])$/);
+      if (match) {
+        const amount = Number(match[1]);
+        const unit = match[2];
+        const ms = unit === 'm' ? amount * 60_000 : unit === 'h' ? amount * 3_600_000 : amount * 86_400_000;
+        timeRange = { start: new Date(now.getTime() - ms).toISOString(), end: now.toISOString() };
+      }
+    }
+
+    // Load chat history from chat_messages for multi-turn context
+    // and store it in the conversationStore keyed by session so the
+    // orchestrator's handleMessage can read it back via conversationStore.getMessages()
+    if (this.deps.chatMessageStore) {
+      const history = await this.deps.chatMessageStore.getMessages(resolvedSessionId);
+      // Sync to conversationStore so the orchestrator can read the history
+      // (the orchestrator reads from conversationStore keyed by sessionId)
+      await this.deps.conversationStore.clearMessages(resolvedSessionId);
+      for (const msg of history) {
+        await this.deps.conversationStore.addMessage(resolvedSessionId, {
+          id: msg.id,
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+          actions: msg.actions,
+          timestamp: msg.timestamp,
+        });
+      }
+    }
 
     const orchestrator = new OrchestratorAgent({
       gateway,
@@ -77,14 +131,40 @@ export class ChatService {
       metricsAdapter,
       allDatasources: config.datasources,
       sendEvent,
+      timeRange,
     }, resolvedSessionId);
 
-    log.info({ sessionId: resolvedSessionId, message: message.slice(0, 80) }, 'starting session orchestrator');
-    const replyContent = await orchestrator.handleMessage(message);
+    // If the user is viewing a specific dashboard, scope the agent to it
+    const dashboardId = pageContext?.kind === 'dashboard' ? pageContext.id : undefined;
+
+    log.info({ sessionId: resolvedSessionId, dashboardId, message: message.slice(0, 80) }, 'starting session orchestrator');
+    const replyContent = await orchestrator.handleMessage(message, dashboardId);
     const assistantActions = orchestrator.consumeConversationActions();
     const navigate = orchestrator.consumeNavigate();
     log.info({ sessionId: resolvedSessionId, reply: replyContent.slice(0, 100) }, 'session orchestrator done');
 
-    return { sessionId: resolvedSessionId, replyContent, assistantMessageId: randomUUID(), navigate };
+    // Persist assistant response to chat_messages
+    const assistantMessageId = randomUUID();
+    if (this.deps.chatMessageStore) {
+      await this.deps.chatMessageStore.addMessage(resolvedSessionId, {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: replyContent,
+        actions: assistantActions.length > 0 ? assistantActions : undefined,
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Update session title from first assistant message if title is empty
+    if (this.deps.chatSessionStore) {
+      const session = await this.deps.chatSessionStore.findById(resolvedSessionId);
+      if (session && !session.title) {
+        // Use first ~60 chars of user message as title
+        const autoTitle = message.length > 60 ? message.slice(0, 57) + '...' : message;
+        await this.deps.chatSessionStore.updateTitle(resolvedSessionId, autoTitle);
+      }
+    }
+
+    return { sessionId: resolvedSessionId, replyContent, assistantMessageId, navigate };
   }
 }

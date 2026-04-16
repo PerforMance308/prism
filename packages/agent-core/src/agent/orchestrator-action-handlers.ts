@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto'
 import type {
   DashboardAction,
   DashboardSseEvent,
+  InvestigationReportSection,
+  PanelConfig,
+  PanelVisualization,
 } from '@agentic-obs/common'
 import type { LLMGateway } from '@agentic-obs/llm-gateway'
 import type { IMetricsAdapter, IWebSearchAdapter } from '../adapters/index.js'
@@ -15,6 +18,7 @@ import type {
 } from './types.js'
 import type { ActionExecutor } from './action-executor.js'
 import type { AlertRuleAgent } from './alert-rule-agent.js'
+import { applyLayout } from './layout-engine.js'
 
 /** Shared context passed to every action handler. */
 export interface ActionContext {
@@ -28,6 +32,7 @@ export interface ActionContext {
   webSearchAdapter?: IWebSearchAdapter
   allDatasources?: DatasourceConfig[]
   sendEvent: (event: DashboardSseEvent) => void
+  sessionId: string
 
   actionExecutor: ActionExecutor
   alertRuleAgent: AlertRuleAgent
@@ -62,7 +67,11 @@ export async function handleDashboardCreate(
     prompt,
     userId: 'agent',
     datasourceIds: [],
+    sessionId: ctx.sessionId,
   })
+
+  // Navigate to the new dashboard so the user can see panels being added
+  ctx.setNavigateTo(`/dashboards/${dashboard.id}`)
 
   const observationText = `Created dashboard "${dashboard.title}" (id: ${dashboard.id}).`
   ctx.sendEvent({ type: 'tool_result', tool: 'dashboard.create', summary: observationText, success: true })
@@ -89,13 +98,158 @@ export async function handleInvestigationCreate(
 
   const investigation = await ctx.investigationStore.create({
     question,
-    sessionId: randomUUID(),
+    sessionId: ctx.sessionId,
     userId: 'agent',
   })
 
   const observationText = `Created investigation "${question.slice(0, 60)}" (id: ${investigation.id}).`
   ctx.sendEvent({ type: 'tool_result', tool: 'investigation.create', summary: observationText, success: true })
   ctx.emitAgentEvent(ctx.makeAgentEvent('agent.tool_completed', { tool: 'investigation.create', investigationId: investigation.id, summary: observationText }))
+  return observationText
+}
+
+// ---------------------------------------------------------------------------
+// Investigation report section accumulator
+// ---------------------------------------------------------------------------
+
+const investigationSections = new Map<string, InvestigationReportSection[]>()
+
+export async function handleInvestigationAddSection(
+  ctx: ActionContext,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const investigationId = String(args.investigationId ?? '')
+  if (!investigationId) return 'Error: "investigationId" is required.'
+
+  const sectionType = String(args.type ?? 'text') as 'text' | 'evidence'
+  const content = String(args.content ?? '')
+  if (!content) return 'Error: "content" is required.'
+
+  ctx.sendEvent({ type: 'tool_call', tool: 'investigation.add_section', args: { investigationId, type: sectionType }, displayText: `Adding ${sectionType} section to investigation` })
+
+  const section: InvestigationReportSection = { type: sectionType, content }
+
+  // Build panel config and capture snapshot for evidence sections
+  if (sectionType === 'evidence' && args.panel && typeof args.panel === 'object') {
+    const p = args.panel as Record<string, unknown>
+    const panelConfig: PanelConfig = {
+      id: randomUUID(),
+      title: String(p.title ?? 'Evidence'),
+      description: '',
+      visualization: (p.visualization ?? 'time_series') as PanelVisualization,
+      queries: Array.isArray(p.queries) ? (p.queries as Record<string, unknown>[]).map((q) => ({
+        refId: String(q.refId ?? 'A'),
+        expr: String(q.expr ?? ''),
+        legendFormat: typeof q.legendFormat === 'string' ? q.legendFormat : undefined,
+        instant: q.instant === true,
+      })) : [],
+      row: 0,
+      col: 0,
+      width: Number(p.width ?? 12),
+      height: Number(p.height ?? 4),
+      unit: typeof p.unit === 'string' ? p.unit : undefined,
+    }
+
+    // Capture snapshot data if metrics adapter is available
+    const queries = panelConfig.queries ?? []
+    if (ctx.metricsAdapter && queries.length > 0) {
+      try {
+        const hasInstantQuery = queries.some((q) => q.instant)
+        if (hasInstantQuery) {
+          // Instant snapshot
+          const results = await ctx.metricsAdapter.instantQuery(queries[0]!.expr)
+          panelConfig.snapshotData = {
+            instant: {
+              data: {
+                result: results.map((r) => ({
+                  metric: r.labels,
+                  value: [r.timestamp, String(r.value)] as [number, string],
+                })),
+              },
+            },
+            capturedAt: new Date().toISOString(),
+          }
+        } else {
+          // Range snapshot
+          const end = new Date()
+          const start = new Date(end.getTime() - 60 * 60_000) // default 1 hour
+          const step = '60s'
+          const rangeResults = await Promise.all(
+            queries.map(async (q) => {
+              const results = await ctx.metricsAdapter!.rangeQuery(q.expr, start, end, step)
+              return {
+                refId: q.refId,
+                series: results.map((r) => ({
+                  labels: r.metric,
+                  points: r.values.map(([ts, val]) => ({ ts, value: Number(val) })),
+                })),
+                totalSeries: results.length,
+              }
+            }),
+          )
+          panelConfig.snapshotData = {
+            range: rangeResults,
+            capturedAt: new Date().toISOString(),
+          }
+        }
+      } catch {
+        // Snapshot capture failed — proceed without snapshot
+      }
+    }
+
+    section.panel = panelConfig
+  }
+
+  // Accumulate section
+  const existing = investigationSections.get(investigationId) ?? []
+  existing.push(section)
+  investigationSections.set(investigationId, existing)
+
+  const observationText = `Added ${sectionType} section to investigation ${investigationId} (${existing.length} sections total).`
+  ctx.sendEvent({ type: 'tool_result', tool: 'investigation.add_section', summary: observationText, success: true })
+  return observationText
+}
+
+export async function handleInvestigationComplete(
+  ctx: ActionContext,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const investigationId = String(args.investigationId ?? '')
+  if (!investigationId) return 'Error: "investigationId" is required.'
+  const summary = String(args.summary ?? '')
+  if (!summary) return 'Error: "summary" is required.'
+
+  ctx.sendEvent({ type: 'tool_call', tool: 'investigation.complete', args: { investigationId }, displayText: `Completing investigation` })
+
+  const sections = investigationSections.get(investigationId) ?? []
+
+  // Save the report
+  await ctx.investigationReportStore.save({
+    id: randomUUID(),
+    dashboardId: investigationId,
+    goal: summary,
+    summary,
+    sections,
+    createdAt: new Date().toISOString(),
+  })
+
+  // Update investigation status if store supports it
+  if (ctx.investigationStore) {
+    try {
+      await ctx.investigationStore.updateStatus(investigationId, 'completed')
+    } catch {
+      // Status update failed — non-fatal
+    }
+  }
+
+  // Clean up accumulated sections
+  investigationSections.delete(investigationId)
+
+  // Navigate to the investigation page
+  ctx.setNavigateTo(`/investigations/${investigationId}`)
+
+  const observationText = `Investigation completed and report saved with ${sections.length} sections. Summary: ${summary}`
+  ctx.sendEvent({ type: 'tool_result', tool: 'investigation.complete', summary: observationText, success: true })
   return observationText
 }
 
@@ -116,7 +270,7 @@ export async function handleDashboardAddPanels(
 
   ctx.sendEvent({ type: 'tool_call', tool: 'dashboard.add_panels', args: { count: panels.length }, displayText: `Adding ${panels.length} panel(s)` })
 
-  const panelConfigs: import('@agentic-obs/common').PanelConfig[] = panels.map((p) => ({
+  const rawPanels: import('@agentic-obs/common').PanelConfig[] = panels.map((p) => ({
     id: randomUUID(),
     title: String(p.title ?? 'Panel'),
     description: String(p.description ?? ''),
@@ -127,8 +281,8 @@ export async function handleDashboardAddPanels(
       legendFormat: typeof q.legendFormat === 'string' ? q.legendFormat : undefined,
       instant: q.instant === true,
     })) : [],
-    row: Number(p.row ?? 0),
-    col: Number(p.col ?? 0),
+    row: 0,
+    col: 0,
     width: Number(p.width ?? 6),
     height: Number(p.height ?? 3),
     unit: typeof p.unit === 'string' ? p.unit : undefined,
@@ -137,6 +291,14 @@ export async function handleDashboardAddPanels(
     decimals: typeof p.decimals === 'number' ? p.decimals : undefined,
     thresholds: Array.isArray(p.thresholds) ? p.thresholds as import('@agentic-obs/common').PanelThreshold[] : undefined,
   }))
+
+  // Apply auto-layout, then offset below existing panels
+  const laidOut = applyLayout(rawPanels)
+  const existing = await ctx.store.findById(dashboardId)
+  const startRow = existing
+    ? Math.max(0, ...existing.panels.map((p) => p.row + p.height))
+    : 0
+  const panelConfigs = laidOut.map((p) => ({ ...p, row: p.row + startRow }))
 
   await ctx.actionExecutor.execute(dashboardId, [{ type: 'add_panels', panels: panelConfigs }])
 

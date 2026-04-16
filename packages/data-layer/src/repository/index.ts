@@ -25,6 +25,8 @@ export type {
   IWorkspaceRepository,
   IInvestigationReportRepository,
   IPostMortemRepository,
+  IChatSessionRepository,
+  IChatMessageRepository,
 } from './interfaces.js';
 
 export type {

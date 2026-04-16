@@ -3,7 +3,7 @@ import type { SqliteClient } from './sqlite-client.js';
 
 // -- Schema versioning ---------------------------------------------------------
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /**
  * Create all tables if they don't exist, and track schema version.
@@ -32,6 +32,14 @@ export function ensureSchema(db: SqliteClient): void {
   if (currentVersion === 1) {
     // SQLite can't ALTER TABLE to drop FK, so recreate the table
     db.run(sql.raw(`DROP TABLE IF EXISTS investigation_reports`));
+  }
+
+  // -- V3 migration: add chat_sessions, chat_messages, and session_id to dashboards
+  if (currentVersion <= 2) {
+    // Add session_id column to dashboards if it doesn't exist
+    try {
+      db.run(sql.raw(`ALTER TABLE dashboards ADD COLUMN session_id TEXT`));
+    } catch { /* column may already exist */ }
   }
 
   // Create all schema tables via Drizzle's push mechanism
@@ -276,6 +284,20 @@ export function ensureSchema(db: SqliteClient): void {
       summary TEXT NOT NULL,
       sections TEXT NOT NULL,
       created_at TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS chat_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+    `CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      actions TEXT,
+      timestamp TEXT NOT NULL
     )`,
   ];
 
