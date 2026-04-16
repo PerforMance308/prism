@@ -485,6 +485,7 @@ export const chatSessions = sqliteTable(
   {
     id: text('id').primaryKey(),
     title: text('title').notNull().default(''),
+    contextSummary: text('context_summary'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },

@@ -12,6 +12,7 @@ function rowToSession(row: DbRow): ChatSession {
     title: row.title,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    ...(row.contextSummary ? { contextSummary: row.contextSummary } : {}),
   };
 }
 
@@ -50,6 +51,15 @@ export class SqliteChatSessionRepository implements IChatSessionRepository {
     const [row] = await this.db
       .update(chatSessions)
       .set({ title, updatedAt: new Date().toISOString() })
+      .where(eq(chatSessions.id, id))
+      .returning();
+    return row ? rowToSession(row) : undefined;
+  }
+
+  async updateContextSummary(id: string, summary: string): Promise<ChatSession | undefined> {
+    const [row] = await this.db
+      .update(chatSessions)
+      .set({ contextSummary: summary, updatedAt: new Date().toISOString() })
       .where(eq(chatSessions.id, id))
       .returning();
     return row ? rowToSession(row) : undefined;

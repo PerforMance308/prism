@@ -25,3 +25,8 @@ export type {
   IAlertRuleStore,
   DatasourceConfig,
 } from './types.js'
+
+// Context compaction
+export { shouldCompact, compactMessages } from './context-compaction.js'
+export type { CompactedContext } from './context-compaction.js'
+export { estimateTokens, estimateMessagesTokens, COMPACTION_THRESHOLD, CONTEXT_WINDOW, KEEP_RECENT_MESSAGES, SUMMARY_MAX_TOKENS } from './token-utils.js'

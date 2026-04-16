@@ -396,6 +396,7 @@ export interface IChatSessionRepository {
   findById(id: string): MaybeAsync<ChatSession | undefined>;
   findAll(limit?: number): MaybeAsync<ChatSession[]>;
   updateTitle(id: string, title: string): MaybeAsync<ChatSession | undefined>;
+  updateContextSummary(id: string, summary: string): MaybeAsync<ChatSession | undefined>;
   delete(id: string): MaybeAsync<boolean>;
 }
 

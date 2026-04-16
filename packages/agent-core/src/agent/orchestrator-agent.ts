@@ -67,6 +67,8 @@ export interface OrchestratorDeps {
   sendEvent: (event: DashboardSseEvent) => void
   timeRange?: { start: string; end: string; timezone?: string }
   maxTokenBudget?: number
+  /** LLM-generated summary of earlier conversation turns (from context compaction) */
+  conversationSummary?: string
 }
 
 const MUTATION_ACTIONS = [
@@ -112,6 +114,7 @@ export class OrchestratorAgent {
       model: deps.model,
       sendEvent: deps.sendEvent,
       maxTokenBudget: deps.maxTokenBudget,
+      conversationSummary: deps.conversationSummary,
     })
 
     log.info(`[Orchestrator] init: metricsAdapter=${deps.metricsAdapter ? 'SET' : 'UNSET'}`)

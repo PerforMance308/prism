@@ -37,6 +37,8 @@ export interface ReActDeps {
   sendEvent: (event: DashboardSseEvent) => void
   /** Maximum total tokens per chat message. Default: 50000 */
   maxTokenBudget?: number
+  /** LLM-generated summary of earlier conversation turns (from context compaction) */
+  conversationSummary?: string
 }
 
 export class ReActLoop {
@@ -157,8 +159,21 @@ export class ReActLoop {
   ): CompletionMessage[] {
     const messages: CompletionMessage[] = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: userMessage },
     ]
+
+    // Inject conversation summary from context compaction if available
+    if (this.deps.conversationSummary) {
+      messages.push({
+        role: 'user',
+        content: `[Conversation Summary]\n${this.deps.conversationSummary}`,
+      })
+      messages.push({
+        role: 'assistant',
+        content: 'Understood. I have the context from the previous conversation.',
+      })
+    }
+
+    messages.push({ role: 'user', content: userMessage })
 
     // Compress older observations to save context window.
     // Keep the last OBSERVATION_KEEP_RECENT in full; summarize earlier ones.

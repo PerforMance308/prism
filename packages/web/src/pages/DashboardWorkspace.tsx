@@ -29,6 +29,7 @@ interface Dashboard {
   createdAt: string;
   updatedAt?: string;
   folder?: string;
+  sessionId?: string;
 }
 
 // Main
@@ -125,6 +126,13 @@ export default function DashboardWorkspace() {
     }
     return () => { globalChat.setPageContext(null); };
   }, [id, timeRange, globalChat]);
+
+  // Load the session that created this dashboard so the ChatPanel shows its history
+  useEffect(() => {
+    if (dashboard?.sessionId && dashboard.sessionId !== globalChat.currentSessionId) {
+      void globalChat.loadSession(dashboard.sessionId);
+    }
+  }, [dashboard?.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Investigation reports are now handled in the Investigations page.
   // No auto-show on dashboard — the chat will display a link instead.

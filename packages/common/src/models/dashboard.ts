@@ -170,6 +170,8 @@ export interface ChatSession {
   title: string;
   createdAt: string;
   updatedAt: string;
+  /** LLM-generated summary of older conversation turns for context compaction */
+  contextSummary?: string;
 }
 
 export interface ChatMessage {

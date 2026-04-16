@@ -22,6 +22,16 @@ export {
   type IAlertRuleStore as IDashboardAlertRuleStore,
   type IInvestigationStore as IDashboardInvestigationStore,
   type DatasourceConfig as DashboardDatasourceConfig,
+  // Context compaction
+  shouldCompact,
+  compactMessages,
+  type CompactedContext,
+  estimateTokens,
+  estimateMessagesTokens,
+  COMPACTION_THRESHOLD,
+  CONTEXT_WINDOW,
+  KEEP_RECENT_MESSAGES,
+  SUMMARY_MAX_TOKENS,
 } from './agent/index.js';
 
 export type { Investigation, InvestigationPlan, InvestigationStatus } from '@agentic-obs/common';

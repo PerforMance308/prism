@@ -9,6 +9,7 @@ import type { InvestigationReport as IReport, InvestigationReportSection } from 
 import type { Evidence } from '@agentic-obs/common';
 import type { InvestigationStatus } from '../api/types.js';
 import { relativeTime } from '../utils/time.js';
+import { useGlobalChat } from '../contexts/ChatContext.js';
 
 // Types
 
@@ -258,6 +259,7 @@ function LiveProgressView({ investigation }: { investigation: FullInvestigation 
 export default function InvestigationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const globalChat = useGlobalChat();
   const [investigation, setInvestigation] = useState<FullInvestigation | null>(null);
   const [conclusion, setConclusion] = useState<ConclusionData | null>(null);
   const [report, setReport] = useState<IReport | null>(null);
@@ -265,6 +267,13 @@ export default function InvestigationDetail() {
   const [error, setError] = useState<string | null>(null);
   const [agentEvents, setAgentEvents] = useState<ChatEvent[]>([]);
   const [agentGenerating, setAgentGenerating] = useState(false);
+
+  // Load the session that created this investigation so the ChatPanel shows its history
+  useEffect(() => {
+    if (investigation?.sessionId && investigation.sessionId !== globalChat.currentSessionId) {
+      void globalChat.loadSession(investigation.sessionId);
+    }
+  }, [investigation?.sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchInvestigation = useCallback(async () => {
     if (!id) return;
@@ -292,6 +301,14 @@ export default function InvestigationDetail() {
   }, [id]);
 
   useEffect(() => { void fetchInvestigation(); }, [fetchInvestigation]);
+
+  // Tell the global chat which investigation the user is viewing
+  useEffect(() => {
+    if (id) {
+      globalChat.setPageContext({ kind: 'investigation', id });
+    }
+    return () => { globalChat.setPageContext(null); };
+  }, [id, globalChat]);
 
   // Poll while investigation is active
   useEffect(() => {

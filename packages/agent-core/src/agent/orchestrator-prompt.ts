@@ -18,7 +18,8 @@ function getSystemSection(): string {
 - All text in the "message" field is displayed to the user. Use it to communicate status and results.
 - After each tool action, you receive an Observation with the result. Use it to decide your next step.
 - If a tool returns an error, do NOT blindly retry the same call. Read the error, diagnose the issue, and try a different approach.
-- Tool results may include data from external sources (metrics backends, web search). If you suspect the data is corrupted or nonsensical, flag it to the user.`
+- Tool results may include data from external sources (metrics backends, web search). If you suspect the data is corrupted or nonsensical, flag it to the user.
+- Prior conversation history may be summarized to manage context. If you see a [Conversation Summary] block, treat it as authoritative — it contains the essential context from earlier turns including artifact IDs and discoveries.`
 }
 
 function getDoingTasksSection(): string {

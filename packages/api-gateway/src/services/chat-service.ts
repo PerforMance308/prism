@@ -3,7 +3,7 @@ import { createLogger } from '@agentic-obs/common';
 import type { DashboardSseEvent } from '@agentic-obs/common';
 import { getSetupConfig } from '../routes/setup.js';
 import { createLlmGateway } from '../routes/llm-factory.js';
-import { DashboardOrchestratorAgent as OrchestratorAgent } from '@agentic-obs/agent-core';
+import { DashboardOrchestratorAgent as OrchestratorAgent, shouldCompact, compactMessages, estimateTokens } from '@agentic-obs/agent-core';
 import type { IDashboardAlertRuleStore as IAlertRuleStore, IDashboardInvestigationStore as IInvestigationStore } from '@agentic-obs/agent-core';
 import { PrometheusMetricsAdapter } from '@agentic-obs/adapters';
 import { resolvePrometheusDatasource } from './dashboard-service.js';
@@ -120,6 +120,36 @@ export class ChatService {
       }
     }
 
+    // --- Context compaction ---
+    // Load existing summary from session, then check if we need to compact further
+    let conversationSummary: string | undefined;
+    if (this.deps.chatSessionStore) {
+      const session = await this.deps.chatSessionStore.findById(resolvedSessionId);
+      conversationSummary = session?.contextSummary || undefined;
+    }
+
+    // Check if chat history is large enough to warrant compaction
+    if (this.deps.chatMessageStore) {
+      const allMessages = await this.deps.chatMessageStore.getMessages(resolvedSessionId);
+      const asCompletionMessages = allMessages.map(m => ({
+        role: m.role as 'user' | 'assistant' | 'system',
+        content: m.content,
+      }));
+
+      // Estimate system prompt tokens (~4000 is a safe estimate for the static prompt)
+      const systemPromptTokenEstimate = 4000;
+      if (shouldCompact(systemPromptTokenEstimate, asCompletionMessages)) {
+        log.info({ sessionId: resolvedSessionId, messageCount: allMessages.length }, 'compacting conversation context');
+        const compacted = await compactMessages(gateway, model, asCompletionMessages);
+        conversationSummary = compacted.summary || conversationSummary;
+
+        // Persist summary for reuse in future turns
+        if (conversationSummary && this.deps.chatSessionStore) {
+          await this.deps.chatSessionStore.updateContextSummary(resolvedSessionId, conversationSummary);
+        }
+      }
+    }
+
     const orchestrator = new OrchestratorAgent({
       gateway,
       model,
@@ -132,6 +162,7 @@ export class ChatService {
       allDatasources: config.datasources,
       sendEvent,
       timeRange,
+      conversationSummary,
     }, resolvedSessionId);
 
     // If the user is viewing a specific dashboard, scope the agent to it
