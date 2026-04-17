@@ -2,6 +2,8 @@
 
 AI-native observability platform. Investigate incidents, generate dashboards, and manage alert rules — powered by LLMs.
 
+![OpenObs demo](docs/demo.gif)
+
 ## What It Does
 
 - **Dashboard generation** — Describe what you want to monitor and OpenObs builds a Grafana-style dashboard with real PromQL queries, auto-discovered from your Prometheus instance.
