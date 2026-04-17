@@ -61,13 +61,9 @@ export interface HeatmapVizProps {
 }
 
 const PAD_LEFT = 60;
-// x-axis labels (14) + gap (2) + totals strip (10) + gap (6)
-const PAD_BOTTOM = 32;
+const PAD_BOTTOM = 24;
 const PAD_TOP = 8;
 const PAD_RIGHT = 8;
-// Height of the per-column totals strip rendered below the x-axis labels.
-const TOTALS_H = 10;
-const TOTALS_GAP_TOP = 2;
 const AXIS_FONT = `11px system-ui, -apple-system, Segoe UI, sans-serif`;
 const TICK_FONT = `10px system-ui, -apple-system, Segoe UI, sans-serif`;
 
@@ -488,34 +484,6 @@ export default function HeatmapViz({
       if (ts === undefined) continue;
       const xPx = plotX + xi * colW + colW / 2;
       ctx.fillText(formatTime(ts), xPx, plotY + plotH + 6);
-    }
-
-    // --- Per-column totals strip (bottom density bar) ---
-    // Each column sums all bucket values at that timestamp; the strip is
-    // colored by that sum on the same ramp as the main heatmap, so darker
-    // bands read as "more activity at this moment". Gives at-a-glance "when
-    // was traffic peak" info that's painful to eyeball from the main cells.
-    const colTotals = xs.map((col) => {
-      let sum = 0;
-      for (const row of ys) {
-        const v = lookup.get(`${col}|${row}`);
-        if (typeof v === 'number' && Number.isFinite(v)) sum += v;
-      }
-      return sum;
-    });
-    let totalsMax = 0;
-    for (const t of colTotals) if (t > totalsMax) totalsMax = t;
-    if (totalsMax > 0) {
-      const stripY = plotY + plotH + 14 + TOTALS_GAP_TOP; // 14 ≈ x-label text height
-      for (let xi = 0; xi < xs.length; xi++) {
-        const total = colTotals[xi] ?? 0;
-        const px = plotX + xi * colW;
-        const tLin = total / totalsMax;
-        const t = applyColorScale(tLin, colorScale);
-        const fill = rampColor(t, shades);
-        ctx.fillStyle = fill ?? emptyFill;
-        ctx.fillRect(px, stripY, colW + 0.5, TOTALS_H);
-      }
     }
   }, [size, prepared, shades, colorScale]);
 

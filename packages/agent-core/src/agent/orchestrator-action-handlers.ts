@@ -374,6 +374,19 @@ export async function handleDashboardAddPanels(
 
   await ctx.actionExecutor.execute(dashboardId, [{ type: 'add_panels', panels: panelConfigs }])
 
+  // Flip the dashboard out of its initial 'generating' state once it has
+  // real panels — the list page shows a yellow "GENERATING" badge until
+  // status becomes 'ready', which looked wrong for a dashboard the user
+  // can already open and see populated. Best-effort; older store shapes
+  // may not implement updateStatus.
+  if (ctx.store.updateStatus) {
+    try {
+      await ctx.store.updateStatus(dashboardId, 'ready')
+    } catch {
+      /* non-fatal — badge will stay 'generating' until next status write */
+    }
+  }
+
   const observationText = `Added ${panelConfigs.length} panel(s): ${panelConfigs.map((p) => p.title).join(', ')}`
   ctx.sendEvent({ type: 'tool_result', tool: 'dashboard.add_panels', summary: observationText, success: true })
   ctx.emitAgentEvent(ctx.makeAgentEvent('agent.tool_completed', { tool: 'dashboard.add_panels', summary: observationText }))
